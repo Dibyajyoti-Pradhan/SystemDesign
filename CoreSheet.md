@@ -37,10 +37,10 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | [**Relational Databases**](study-guide/02%20-%20Databases%20%26%20Data%20Management/01%20-%20Relational%20Databases.pdf) | Structured data storage with ACID guarantees (e.g., MySQL, Postgres) | SQL schema design, Indexing (B-Tree/B+Tree), Joins vs denormalization, Transactions |
 | [**NoSQL Databases**](study-guide/02%20-%20Databases%20%26%20Data%20Management/02%20-%20NoSQL%20Databases.pdf) | Non-relational, flexible-schema (Key-Value, Document, Wide-Column) | MongoDB, Cassandra, DynamoDB, CAP trade-offs, Data modeling, Horizontal scalability |
-| **Data Warehousing & OLAP** | For analytical queries and business intelligence (Redshift, Snowflake) | Columnar storage, MPP (Massively Parallel Processing), Star/Snowflake schema, ETL/ELT |
-| **In-memory Stores** | High-speed data access (Redis, Memcached) | Eviction policies, Persistence modes (AOF, RDB), Pub/Sub, Used for caching, Leaderboards, Rate limiting |
-| **Search & Indexing** | Full-text or structured search at scale (Elasticsearch, Solr) | Inverted indexes, Relevance scoring, Distributed search, Sharding search indexes |
-| **Time-Series Databases** | Optimized for time-stamped data (InfluxDB, Prometheus) | Compression, Downsampling, Retention policies, High ingest rates |
+| [**Data Warehousing & OLAP**](study-guide/02%20-%20Databases%20%26%20Data%20Management/03%20-%20Data%20Warehousing%20and%20OLAP.pdf) | For analytical queries and business intelligence (Redshift, Snowflake) | Columnar storage, MPP (Massively Parallel Processing), Star/Snowflake schema, ETL/ELT |
+| [**In-memory Stores**](study-guide/02%20-%20Databases%20%26%20Data%20Management/04%20-%20In-Memory%20Stores.pdf) | High-speed data access (Redis, Memcached) | Eviction policies, Persistence modes (AOF, RDB), Pub/Sub, Used for caching, Leaderboards, Rate limiting |
+| [**Search & Indexing**](study-guide/02%20-%20Databases%20%26%20Data%20Management/05%20-%20Search%20and%20Indexing.pdf) | Full-text or structured search at scale (Elasticsearch, Solr) | Inverted indexes, Relevance scoring, Distributed search, Sharding search indexes |
+| [**Time-Series Databases**](study-guide/02%20-%20Databases%20%26%20Data%20Management/06%20-%20Time-Series%20Databases.pdf) | Optimized for time-stamped data (InfluxDB, Prometheus) | Compression, Downsampling, Retention policies, High ingest rates |
 | **Graph Databases** | For highly interconnected data (Neo4j, JanusGraph) | Nodes/edges/relationships, Traversals (DFS/BFS), Cypher/Gremlin queries |
 | **Backup & Restore** | Strategies to ensure data persistence | Incremental vs full backups, Point-in-time recovery, Snapshots, Cross-region backups |
 
