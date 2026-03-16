@@ -13,37 +13,37 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 ## 1. **Core System Design Fundamentals**
 
-| Topic                        | Description                                                                        | Focus Area                                                                                   | Studied |
-| ---------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------- |
-| **Scalability**              | Handling increased load (users, data) without compromising performance             | Vertical vs Horizontal scaling, Scale-up vs Scale-out, Auto-scaling, Cloud elasticity        | - [ ]   |
-| **Availability**             | Ensuring the system remains accessible even under failures                         | High Availability (HA) techniques, Redundancy, Active–Passive vs Active–Active, MTTR/MTBF    | - [ ]   |
-| **Latency & Throughput**     | Measuring system performance and capacity                                          | Tail latency, P99 metrics, Throughput optimization, Benchmarking                             | - [ ]   |
-| **Reliability**              | Building systems that function correctly despite internal issues                   | Fault tolerance, Error budgets, Resiliency patterns (circuit breakers, retries)              | - [ ]   |
-| **CAP Theorem**              | Trade-offs in distributed systems (Consistency, Availability, Partition tolerance) | AP vs CP systems, Eventual consistency, Use-case-based decisions                             | - [ ]   |
-| **Consistency Models**       | Different ways distributed systems handle read/write synchronization               | Strong, Eventual, Causal, Monotonic, Read-after-write consistency                            | - [ ]   |
-| **Partitioning & Sharding**  | Splitting data across multiple nodes for scalability                               | Range-based, Hash-based, Directory-based partitioning, Rebalancing, Hotspot handling         | - [ ]   |
-| **Replication**              | Copying data/services across multiple nodes for redundancy                         | Master–Slave, Master–Master, Synchronous vs Async, Follower reads, Quorum-based writes       | - [ ]   |
-| **Caching**                  | Storing frequently accessed data in faster storage                                 | Redis, Memcached, Cache invalidation policies (LRU, LFU), CDN-based caching, Cache hierarchy | - [ ]   |
-| **Proxies**                  | Intermediate servers that act as gateways or mediators                             | Reverse proxy (NGINX, HAProxy), Forward proxy, SSL termination, Load balancing at L4/L7      | - [ ]   |
-| **Load Balancing**           | Distributing incoming requests across multiple servers                             | Round Robin, Least Connections, Consistent Hashing, Health checks, Global load balancing     | - [ ]   |
-| **Message Queues / Pub-Sub** | Asynchronous communication & decoupling                                            | Kafka, RabbitMQ, SQS/SNS, Consumer groups, Partitioning, Offsets                             | - [ ]   |
-| **Streaming vs Batch**       | Real-time vs Offline data processing                                               | Spark/Flink streaming, Hadoop/MapReduce batch, Windowing, Latency vs throughput              | - [ ]   |
-| **MapReduce**                | Large-scale batch processing paradigm                                              | Split (map), Shuffle/Sort, Reduce, Fault tolerance                                           | - [ ]   |
+| Topic                        | Description                                                                        | Focus Area                                                                                   | Studied | Study Guide |
+| ---------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------- | ----------- |
+| **Scalability**              | Handling increased load (users, data) without compromising performance             | Vertical vs Horizontal scaling, Scale-up vs Scale-out, Auto-scaling, Cloud elasticity        | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/01%20-%20Scalability.pdf) |
+| **Availability**             | Ensuring the system remains accessible even under failures                         | High Availability (HA) techniques, Redundancy, Active–Passive vs Active–Active, MTTR/MTBF    | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/02%20-%20Availability.pdf) |
+| **Latency & Throughput**     | Measuring system performance and capacity                                          | Tail latency, P99 metrics, Throughput optimization, Benchmarking                             | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/03%20-%20Latency%20and%20Throughput.pdf) |
+| **Reliability**              | Building systems that function correctly despite internal issues                   | Fault tolerance, Error budgets, Resiliency patterns (circuit breakers, retries)              | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/04%20-%20Reliability.pdf) |
+| **CAP Theorem**              | Trade-offs in distributed systems (Consistency, Availability, Partition tolerance) | AP vs CP systems, Eventual consistency, Use-case-based decisions                             | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/05%20-%20CAP%20Theorem.pdf) |
+| **Consistency Models**       | Different ways distributed systems handle read/write synchronization               | Strong, Eventual, Causal, Monotonic, Read-after-write consistency                            | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/06%20-%20Consistency%20Models.pdf) |
+| **Partitioning & Sharding**  | Splitting data across multiple nodes for scalability                               | Range-based, Hash-based, Directory-based partitioning, Rebalancing, Hotspot handling         | - [ ]   | [📖 Read](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/07%20-%20Partitioning%20and%20Sharding.pdf) |
+| **Replication**              | Copying data/services across multiple nodes for redundancy                         | Master–Slave, Master–Master, Synchronous vs Async, Follower reads, Quorum-based writes       | - [ ]   |  |
+| **Caching**                  | Storing frequently accessed data in faster storage                                 | Redis, Memcached, Cache invalidation policies (LRU, LFU), CDN-based caching, Cache hierarchy | - [ ]   |  |
+| **Proxies**                  | Intermediate servers that act as gateways or mediators                             | Reverse proxy (NGINX, HAProxy), Forward proxy, SSL termination, Load balancing at L4/L7      | - [ ]   |  |
+| **Load Balancing**           | Distributing incoming requests across multiple servers                             | Round Robin, Least Connections, Consistent Hashing, Health checks, Global load balancing     | - [ ]   |  |
+| **Message Queues / Pub-Sub** | Asynchronous communication & decoupling                                            | Kafka, RabbitMQ, SQS/SNS, Consumer groups, Partitioning, Offsets                             | - [ ]   |  |
+| **Streaming vs Batch**       | Real-time vs Offline data processing                                               | Spark/Flink streaming, Hadoop/MapReduce batch, Windowing, Latency vs throughput              | - [ ]   |  |
+| **MapReduce**                | Large-scale batch processing paradigm                                              | Split (map), Shuffle/Sort, Reduce, Fault tolerance                                           | - [ ]   |  |
 
 ---
 
 ## 2. **Databases & Data Management**
 
-| Topic                       | Description                                                            | Focus Area                                                                                              | Studied |
-| --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------- |
-| **Relational Databases**    | Structured data storage with ACID guarantees (e.g., MySQL, Postgres)   | SQL schema design, Indexing (B-Tree/B+Tree), Joins vs denormalization, Transactions                     | - [ ]   |
-| **NoSQL Databases**         | Non-relational, flexible-schema (Key-Value, Document, Wide-Column)     | MongoDB, Cassandra, DynamoDB, CAP trade-offs, Data modeling, Horizontal scalability                     | - [ ]   |
-| **Data Warehousing & OLAP** | For analytical queries and business intelligence (Redshift, Snowflake) | Columnar storage, MPP (Massively Parallel Processing), Star/Snowflake schema, ETL/ELT                   | - [ ]   |
-| **In-memory Stores**        | High-speed data access (Redis, Memcached)                              | Eviction policies, Persistence modes (AOF, RDB), Pub/Sub, Used for caching, Leaderboards, Rate limiting | - [ ]   |
-| **Search & Indexing**       | Full-text or structured search at scale (Elasticsearch, Solr)          | Inverted indexes, Relevance scoring, Distributed search, Sharding search indexes                        | - [ ]   |
-| **Time-Series Databases**   | Optimized for time-stamped data (InfluxDB, Prometheus)                 | Compression, Downsampling, Retention policies, High ingest rates                                        | - [ ]   |
-| **Graph Databases**         | For highly interconnected data (Neo4j, JanusGraph)                     | Nodes/edges/relationships, Traversals (DFS/BFS), Cypher/Gremlin queries                                 | - [ ]   |
-| **Backup & Restore**        | Strategies to ensure data persistence                                  | Incremental vs full backups, Point-in-time recovery, Snapshots, Cross-region backups                    | - [ ]   |
+| Topic                       | Description                                                            | Focus Area                                                                                              | Studied | Study Guide |
+| --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------- | ----------- |
+| **Relational Databases**    | Structured data storage with ACID guarantees (e.g., MySQL, Postgres)   | SQL schema design, Indexing (B-Tree/B+Tree), Joins vs denormalization, Transactions                     | - [ ]   | [📖 Read](study-guide/02%20-%20Databases%20%26%20Data%20Management/01%20-%20Relational%20Databases.pdf) |
+| **NoSQL Databases**         | Non-relational, flexible-schema (Key-Value, Document, Wide-Column)     | MongoDB, Cassandra, DynamoDB, CAP trade-offs, Data modeling, Horizontal scalability                     | - [ ]   |  |
+| **Data Warehousing & OLAP** | For analytical queries and business intelligence (Redshift, Snowflake) | Columnar storage, MPP (Massively Parallel Processing), Star/Snowflake schema, ETL/ELT                   | - [ ]   |  |
+| **In-memory Stores**        | High-speed data access (Redis, Memcached)                              | Eviction policies, Persistence modes (AOF, RDB), Pub/Sub, Used for caching, Leaderboards, Rate limiting | - [ ]   |  |
+| **Search & Indexing**       | Full-text or structured search at scale (Elasticsearch, Solr)          | Inverted indexes, Relevance scoring, Distributed search, Sharding search indexes                        | - [ ]   |  |
+| **Time-Series Databases**   | Optimized for time-stamped data (InfluxDB, Prometheus)                 | Compression, Downsampling, Retention policies, High ingest rates                                        | - [ ]   |  |
+| **Graph Databases**         | For highly interconnected data (Neo4j, JanusGraph)                     | Nodes/edges/relationships, Traversals (DFS/BFS), Cypher/Gremlin queries                                 | - [ ]   |  |
+| **Backup & Restore**        | Strategies to ensure data persistence                                  | Incremental vs full backups, Point-in-time recovery, Snapshots, Cross-region backups                    | - [ ]   |  |
 
 ---
 
