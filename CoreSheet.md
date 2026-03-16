@@ -21,10 +21,10 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**CAP Theorem**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/05%20-%20CAP%20Theorem.pdf) | Trade-offs in distributed systems (Consistency, Availability, Partition tolerance) | AP vs CP systems, Eventual consistency, Use-case-based decisions |
 | [**Consistency Models**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/06%20-%20Consistency%20Models.pdf) | Different ways distributed systems handle read/write synchronization | Strong, Eventual, Causal, Monotonic, Read-after-write consistency |
 | [**Partitioning & Sharding**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/07%20-%20Partitioning%20and%20Sharding.pdf) | Splitting data across multiple nodes for scalability | Range-based, Hash-based, Directory-based partitioning, Rebalancing, Hotspot handling |
-| **Replication** | Copying data/services across multiple nodes for redundancy | Master–Slave, Master–Master, Synchronous vs Async, Follower reads, Quorum-based writes |
-| **Caching** | Storing frequently accessed data in faster storage | Redis, Memcached, Cache invalidation policies (LRU, LFU), CDN-based caching, Cache hierarchy |
-| **Proxies** | Intermediate servers that act as gateways or mediators | Reverse proxy (NGINX, HAProxy), Forward proxy, SSL termination, Load balancing at L4/L7 |
-| **Load Balancing** | Distributing incoming requests across multiple servers | Round Robin, Least Connections, Consistent Hashing, Health checks, Global load balancing |
+| [**Replication**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/08%20-%20Replication.pdf) | Copying data/services across multiple nodes for redundancy | Master–Slave, Master–Master, Synchronous vs Async, Follower reads, Quorum-based writes |
+| [**Caching**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/09%20-%20Caching.pdf) | Storing frequently accessed data in faster storage | Redis, Memcached, Cache invalidation policies (LRU, LFU), CDN-based caching, Cache hierarchy |
+| [**Proxies**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/10%20-%20Proxies.pdf) | Intermediate servers that act as gateways or mediators | Reverse proxy (NGINX, HAProxy), Forward proxy, SSL termination, Load balancing at L4/L7 |
+| [**Load Balancing**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/11%20-%20Load%20Balancing.pdf) | Distributing incoming requests across multiple servers | Round Robin, Least Connections, Consistent Hashing, Health checks, Global load balancing |
 | **Message Queues / Pub-Sub** | Asynchronous communication & decoupling | Kafka, RabbitMQ, SQS/SNS, Consumer groups, Partitioning, Offsets |
 | **Streaming vs Batch** | Real-time vs Offline data processing | Spark/Flink streaming, Hadoop/MapReduce batch, Windowing, Latency vs throughput |
 | **MapReduce** | Large-scale batch processing paradigm | Split (map), Shuffle/Sort, Reduce, Fault tolerance |
