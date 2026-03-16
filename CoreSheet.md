@@ -25,9 +25,9 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**Caching**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/09%20-%20Caching.pdf) | Storing frequently accessed data in faster storage | Redis, Memcached, Cache invalidation policies (LRU, LFU), CDN-based caching, Cache hierarchy |
 | [**Proxies**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/10%20-%20Proxies.pdf) | Intermediate servers that act as gateways or mediators | Reverse proxy (NGINX, HAProxy), Forward proxy, SSL termination, Load balancing at L4/L7 |
 | [**Load Balancing**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/11%20-%20Load%20Balancing.pdf) | Distributing incoming requests across multiple servers | Round Robin, Least Connections, Consistent Hashing, Health checks, Global load balancing |
-| **Message Queues / Pub-Sub** | Asynchronous communication & decoupling | Kafka, RabbitMQ, SQS/SNS, Consumer groups, Partitioning, Offsets |
-| **Streaming vs Batch** | Real-time vs Offline data processing | Spark/Flink streaming, Hadoop/MapReduce batch, Windowing, Latency vs throughput |
-| **MapReduce** | Large-scale batch processing paradigm | Split (map), Shuffle/Sort, Reduce, Fault tolerance |
+| [**Message Queues / Pub-Sub**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/12%20-%20Message%20Queues%20and%20Pub-Sub.pdf) | Asynchronous communication & decoupling | Kafka, RabbitMQ, SQS/SNS, Consumer groups, Partitioning, Offsets |
+| [**Streaming vs Batch**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/13%20-%20Streaming%20vs%20Batch%20Processing.pdf) | Real-time vs Offline data processing | Spark/Flink streaming, Hadoop/MapReduce batch, Windowing, Latency vs throughput |
+| [**MapReduce**](study-guide/01%20-%20Core%20System%20Design%20Fundamentals/14%20-%20MapReduce.pdf) | Large-scale batch processing paradigm | Split (map), Shuffle/Sort, Reduce, Fault tolerance |
 
 ---
 
@@ -36,7 +36,7 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | Topic                       | Description                                                            | Focus Area |
 | --------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | [**Relational Databases**](study-guide/02%20-%20Databases%20%26%20Data%20Management/01%20-%20Relational%20Databases.pdf) | Structured data storage with ACID guarantees (e.g., MySQL, Postgres) | SQL schema design, Indexing (B-Tree/B+Tree), Joins vs denormalization, Transactions |
-| **NoSQL Databases** | Non-relational, flexible-schema (Key-Value, Document, Wide-Column) | MongoDB, Cassandra, DynamoDB, CAP trade-offs, Data modeling, Horizontal scalability |
+| [**NoSQL Databases**](study-guide/02%20-%20Databases%20%26%20Data%20Management/02%20-%20NoSQL%20Databases.pdf) | Non-relational, flexible-schema (Key-Value, Document, Wide-Column) | MongoDB, Cassandra, DynamoDB, CAP trade-offs, Data modeling, Horizontal scalability |
 | **Data Warehousing & OLAP** | For analytical queries and business intelligence (Redshift, Snowflake) | Columnar storage, MPP (Massively Parallel Processing), Star/Snowflake schema, ETL/ELT |
 | **In-memory Stores** | High-speed data access (Redis, Memcached) | Eviction policies, Persistence modes (AOF, RDB), Pub/Sub, Used for caching, Leaderboards, Rate limiting |
 | **Search & Indexing** | Full-text or structured search at scale (Elasticsearch, Solr) | Inverted indexes, Relevance scoring, Distributed search, Sharding search indexes |
