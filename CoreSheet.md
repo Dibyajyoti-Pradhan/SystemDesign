@@ -93,8 +93,8 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 | Topic                               | Description                                                       | Focus Area|
 | ----------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Authentication & Authorization** | Verifying users (AuthN) & controlling their access (AuthZ) | OAuth2, OIDC, JWT, SAML, SSO, Role-based access control (RBAC) |
-| **TLS/SSL & Encryption** | Securing data in transit & at rest | Certificates, Key management, Perfect Forward Secrecy, Client-side encryption |
+| [**Authentication & Authorization**](study-guide/06%20-%20Security%20%26%20Compliance/01%20-%20Authentication%20and%20Authorization.pdf) | Verifying users (AuthN) & controlling their access (AuthZ) | OAuth2, OIDC, JWT, SAML, SSO, Role-based access control (RBAC) |
+| [**TLS/SSL & Encryption**](study-guide/06%20-%20Security%20%26%20Compliance/02%20-%20TLS%20and%20SSL%20Encryption.pdf) | Securing data in transit & at rest | Certificates, Key management, Perfect Forward Secrecy, Client-side encryption |
 | **Rate Limiting & Throttling** | Controlling request rates to prevent overload/abuse | Token Bucket, Leaky Bucket, Sliding Window counters, Quotas, DDoS protection |
 | **API Security** | Ensuring secure communication & preventing unauthorized API calls | HMAC, API keys, OAuth scopes, WAF (Web Application Firewall) |
 | **Secrets Management** | Storing & rotating credentials, tokens, keys | HashiCorp Vault, AWS Secrets Manager, GCP Secret Manager, KMS |
