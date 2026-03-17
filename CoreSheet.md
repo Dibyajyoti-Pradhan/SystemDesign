@@ -70,7 +70,7 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**Domain-Driven Design (DDD)**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/05%20-%20Domain-Driven%20Design.pdf) | Modeling complex domains into bounded contexts | Ubiquitous language, Aggregates, Repositories, Entities, Value Objects |
 | [**CQRS & Event Sourcing**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/06%20-%20CQRS%20and%20Event%20Sourcing.pdf) | Separate commands from queries; store state changes as events | Projections, Write vs read models, Event replay |
 | [**Saga Pattern**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/07%20-%20Saga%20Pattern.pdf) | Handling distributed transactions across microservices | Choreography vs orchestration, Compensating transactions, Rollbacks |
-| **Strangler Fig Pattern** | Incrementally migrating from monolith to microservices | Proxy approach, Routing rules, Gradual replacement of legacy components |
+| [**Strangler Fig Pattern**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/08%20-%20Strangler%20Fig%20Pattern.pdf) | Incrementally migrating from monolith to microservices | Proxy approach, Routing rules, Gradual replacement of legacy components |
 
 ---
 
@@ -78,9 +78,9 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 | Topic                         | Description                                                                   | Focus Area|
 | ----------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Docker & Containerization** | Packaging apps into isolated, lightweight containers | Images, Dockerfiles, Container networking, Volume mounts |
-| **Kubernetes (K8s)** | Orchestrating containerized apps at scale | Pods, Deployments, Services, Ingress, StatefulSets, RBAC, Autoscaling |
-| **Infrastructure as Code** | Managing servers/networks as code (Terraform, CloudFormation) | Declarative configs, Immutable infrastructure, Version-controlled infra |
+| [**Docker & Containerization**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/01%20-%20Docker%20and%20Containerization.pdf) | Packaging apps into isolated, lightweight containers | Images, Dockerfiles, Container networking, Volume mounts |
+| [**Kubernetes (K8s)**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/02%20-%20Kubernetes.pdf) | Orchestrating containerized apps at scale | Pods, Deployments, Services, Ingress, StatefulSets, RBAC, Autoscaling |
+| [**Infrastructure as Code**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/03%20-%20Infrastructure%20as%20Code.pdf) | Managing servers/networks as code (Terraform, CloudFormation) | Declarative configs, Immutable infrastructure, Version-controlled infra |
 | **CI/CD Pipelines** | Automated build, test, and deployment processes | Jenkins, GitLab CI, GitHub Actions, Canary/BG deployments |
 | **Serverless (FaaS/BaaS)** | Running code/functions without provisioning servers | AWS Lambda, GCP Cloud Functions, Azure Functions, Event triggers, Cold starts |
 | **Config Management** | Tools for environment consistency (Ansible, Chef, Puppet) | Playbooks, Cookbooks, Manifests, Versioned configurations, Secrets management |
