@@ -1,0 +1,1932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TypeAhead and Autocomplete System Design</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.6;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar TOC */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background-color: #ffffff;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto;
+            padding: 24px 0;
+            z-index: 100;
+        }
+
+        .sidebar-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 0 24px 16px 24px;
+        }
+
+        .toc {
+            list-style: none;
+        }
+
+        .toc li {
+            margin: 0;
+        }
+
+        .toc a {
+            display: block;
+            padding: 8px 24px;
+            color: #1a1a1a;
+            text-decoration: none;
+            font-size: 14px;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .toc a:hover {
+            background-color: #f5f5f5;
+            border-left-color: #0066cc;
+            color: #0066cc;
+        }
+
+        .toc a.active {
+            background-color: #f0f7ff;
+            border-left-color: #0066cc;
+            color: #0066cc;
+            font-weight: 600;
+        }
+
+        /* Main content */
+        .main {
+            margin-left: 280px;
+            padding: 48px 64px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #1a1a1a;
+        }
+
+        h2 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-top: 48px;
+            margin-bottom: 24px;
+            color: #1a1a1a;
+            scroll-margin-top: 100px;
+        }
+
+        h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 16px;
+            color: #1a1a1a;
+        }
+
+        p {
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 32px;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background-color: #1e1e2e;
+            color: #e0e0e0;
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 16px 0;
+            font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .code-block .keyword { color: #ff79c6; font-weight: bold; }
+        .code-block .string { color: #f1fa8c; }
+        .code-block .comment { color: #6272a4; }
+        .code-block .number { color: #bd93f9; }
+        .code-block .function { color: #50fa7b; }
+        .code-block .class { color: #8be9fd; font-style: italic; }
+        .code-block .operator { color: #ff79c6; }
+
+        /* Callout boxes */
+        .callout {
+            padding: 16px;
+            margin: 16px 0;
+            border-left: 4px solid;
+            background-color: #fafafa;
+            border-radius: 4px;
+        }
+
+        .callout.note {
+            border-left-color: #0066cc;
+            background-color: #f0f7ff;
+        }
+
+        .callout.warning {
+            border-left-color: #ff9800;
+            background-color: #fff3e0;
+        }
+
+        .callout.tip {
+            border-left-color: #4caf50;
+            background-color: #f1f8e9;
+        }
+
+        .callout.insight {
+            border-left-color: #9c27b0;
+            background-color: #f3e5f5;
+        }
+
+        .callout strong {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        thead {
+            background-color: #f5f5f5;
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 14px;
+        }
+
+        tbody tr:nth-child(odd) {
+            background-color: #fafafa;
+        }
+
+        tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        /* Diagrams */
+        .diagram-container {
+            margin: 24px 0;
+            padding: 24px;
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+
+        svg {
+            display: block;
+            margin: 0 auto;
+            font-family: inherit;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 16px 0 16px 32px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -280px;
+                transition: left 0.3s;
+                z-index: 1000;
+                box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .main {
+                margin-left: 0;
+                padding: 24px 16px;
+            }
+
+            .toggle-sidebar {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 999;
+                background: white;
+                border: 1px solid #e0e0e0;
+                padding: 8px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                display: none;
+            }
+
+            body.mobile .toggle-sidebar {
+                display: block;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            h2 {
+                font-size: 22px;
+            }
+
+            .code-block {
+                font-size: 12px;
+            }
+        }
+
+        .section-ref {
+            display: inline-block;
+            margin-bottom: 32px;
+        }
+
+        .comparison-table td {
+            word-break: break-word;
+        }
+
+        .metric {
+            font-family: "Monaco", monospace;
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+
+        .formula {
+            background-color: #f9f9f9;
+            padding: 12px;
+            border-left: 3px solid #0066cc;
+            margin: 12px 0;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        strong {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="toggle-sidebar">☰</div>
+
+    <aside class="sidebar">
+        <div class="sidebar-title">Table of Contents</div>
+        <ul class="toc">
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#clarifying">Clarifying Questions</a></li>
+            <li><a href="#functional">Functional Requirements</a></li>
+            <li><a href="#nonfunctional">Non-Functional Requirements</a></li>
+            <li><a href="#capacity">Capacity Estimation</a></li>
+            <li><a href="#architecture">High-Level Architecture</a></li>
+            <li><a href="#trie">Core Data Structure: Trie</a></li>
+            <li><a href="#ranking">Ranking & Scoring</a></li>
+            <li><a href="#database">Database & Persistence</a></li>
+            <li><a href="#caching">Caching Layer</a></li>
+            <li><a href="#pipeline">Trie Update Pipeline</a></li>
+            <li><a href="#requestpath">Request Path Deep Dive</a></li>
+            <li><a href="#partitioning">Partitioning Strategy</a></li>
+            <li><a href="#personalization">Personalization Layer</a></li>
+            <li><a href="#multilang">Multi-Language Support</a></li>
+            <li><a href="#failuremodes">Failure Modes & Mitigations</a></li>
+            <li><a href="#tradeoffs">Trade-offs & Alternatives</a></li>
+            <li><a href="#playbook">Interview Playbook</a></li>
+        </ul>
+    </aside>
+
+    <main class="main">
+        <h1>TypeAhead & Autocomplete System Design</h1>
+        <p class="subtitle">A scalable, low-latency suggestion engine serving billions of queries daily</p>
+
+        <!-- OVERVIEW -->
+        <section id="overview" class="section-ref">
+            <h2>Overview</h2>
+            <p>
+                A TypeAhead/Autocomplete system powers real-time search suggestions as users type, reducing query time and improving UX. This document covers designing a system that handles <strong>5 billion queries per day</strong> (58K QPS peak) with <strong>&lt;100ms end-to-end latency</strong> at p99, using a <strong>Trie</strong> as the core data structure, <strong>Redis</strong> for caching prefixes, and <strong>Cassandra</strong> for persistent trie snapshots.
+            </p>
+            <p>
+                You'd encounter this in a system design interview at top-tier tech companies (Google, Amazon, Meta, Microsoft) as a real product problem with clear scale challenges and elegant distributed systems trade-offs.
+            </p>
+        </section>
+
+        <!-- CLARIFYING QUESTIONS -->
+        <section id="clarifying" class="section-ref">
+            <h2>Clarifying Questions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Question</th>
+                        <th>Why It Matters</th>
+                        <th>Typical Answer</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>What's the scope: search queries, user names, products, or all?</td>
+                        <td>Determines vocabulary size, freshness requirements, and ranking signal relevance</td>
+                        <td>Focus on search queries; design generalizes to others</td>
+                    </tr>
+                    <tr>
+                        <td>How frequently do suggestion results change?</td>
+                        <td>Impacts update pipeline frequency and cache TTL strategy</td>
+                        <td>Popularity shifts hourly; recompute rankings daily, trie weekly</td>
+                    </tr>
+                    <tr>
+                        <td>Do we need real-time personalization or global suggestions?</td>
+                        <td>Affects caching strategy, storage, and request latency</td>
+                        <td>Start with global; personalization as overlay</td>
+                    </tr>
+                    <tr>
+                        <td>What's the acceptable latency target for suggestions?</td>
+                        <td>Drives architecture choices (in-memory caching vs. computation)</td>
+                        <td>p50 &lt; 50ms, p99 &lt; 100ms</td>
+                    </tr>
+                    <tr>
+                        <td>How many suggestions should we return per query?</td>
+                        <td>Impacts cache size, bandwidth, and ranking computation</td>
+                        <td>Top 10 suggestions</td>
+                    </tr>
+                    <tr>
+                        <td>Is multi-language support required?</td>
+                        <td>Affects Trie structure, storage, and Unicode handling</td>
+                        <td>Yes; start with en/es/fr/de/zh, expand later</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- FUNCTIONAL REQUIREMENTS -->
+        <section id="functional" class="section-ref">
+            <h2>Functional Requirements</h2>
+            <ol>
+                <li><strong>Autocomplete API:</strong> Given a prefix, return top-10 ranked suggestions within 100ms</li>
+                <li><strong>Ranking:</strong> Suggestions ranked by relevance (popularity + recency + user context)</li>
+                <li><strong>Freshness:</strong> Daily updates to rankings; weekly updates to vocabulary (new terms)</li>
+                <li><strong>Scale:</strong> Handle 5B queries/day globally; peak 58K QPS (7x average)</li>
+                <li><strong>Correctness:</strong> Exact-match filtering; support prefix matching for UTF-8 strings</li>
+                <li><strong>Spelling:</strong> Fuzzy matching support for typos (e.g., "appl" → "apple")</li>
+                <li><strong>Analytics:</strong> Log queries for trending, seasonal patterns, and model training</li>
+                <li><strong>Monitoring:</strong> Alert on latency SLA breach, cache hit rate drop, or trie staleness</li>
+            </ol>
+        </section>
+
+        <!-- NON-FUNCTIONAL REQUIREMENTS -->
+        <section id="nonfunctional" class="section-ref">
+            <h2>Non-Functional Requirements</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Requirement</th>
+                        <th>Target</th>
+                        <th>Implication</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Latency (p99)</td>
+                        <td>&lt; 100ms end-to-end</td>
+                        <td>Requires caching all hot prefixes in Redis; trie lookup must be O(m) where m &lt; 20</td>
+                    </tr>
+                    <tr>
+                        <td>Availability</td>
+                        <td>99.99% (4 nines)</td>
+                        <td>Multi-region replication, fallback to stale cache, graceful degradation on failures</td>
+                    </tr>
+                    <tr>
+                        <td>QPS Capacity</td>
+                        <td>100K QPS (peak)</td>
+                        <td>Horizontal scaling with consistent hashing; ~10-20 suggestion servers per region</td>
+                    </tr>
+                    <tr>
+                        <td>Cache Hit Rate</td>
+                        <td>&gt; 90%</td>
+                        <td>Keep hot 1-3 char prefixes always cached; refresh stale entries in background</td>
+                    </tr>
+                    <tr>
+                        <td>Storage (Trie)</td>
+                        <td>&lt; 500 GB per region</td>
+                        <td>Trie serialization ~100 bytes per term; ~5M terms = 500GB</td>
+                    </tr>
+                    <tr>
+                        <td>Network Bandwidth</td>
+                        <td>&lt; 1 Gbps per region</td>
+                        <td>Compress JSON responses; typical response 1-2 KB</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- CAPACITY ESTIMATION -->
+        <section id="capacity" class="section-ref">
+            <h2>Capacity Estimation</h2>
+
+            <h3>Query Volume</h3>
+            <div class="formula">
+Queries per day: 5 billion<br>
+Average QPS: 5B / 86400s = ~57,870 ≈ 58K<br>
+Peak QPS (7x average): ~58K × 7 = 406K (rough peak)<br>
+For capacity: assume 100K QPS sustained peak
+            </div>
+
+            <h3>Cache Size</h3>
+            <div class="formula">
+Hot prefixes: 1-3 characters; ~26³ = 17,576 possible (English)<br>
+But realistically: 80/20 rule → 20% of prefixes = 3,515<br>
+Per prefix: 10 suggestions × ~50 bytes (term + score + metadata) = 500 bytes<br>
+Cache size: 3,515 × 500 bytes ≈ 1.7 GB per region<br>
+With replication (2x): ~3.4 GB total Redis memory
+            </div>
+
+            <h3>Trie Storage</h3>
+            <div class="formula">
+Vocabulary size: ~5 million unique search terms (English, global queries)<br>
+Serialized trie node: ~100 bytes avg (character key + frequency + child pointers)<br>
+Total trie size: 5M × 100 bytes = 500 GB (compressed: ~100-200 GB with gzip)<br>
+Stored in Cassandra with 3x replication = 300-600 GB total distributed
+            </div>
+
+            <h3>Network Bandwidth</h3>
+            <div class="formula">
+Requests: 100K QPS<br>
+Avg request size: 50 bytes (HTTP headers + JSON: {"prefix":"ap"})<br>
+Avg response size: 1.5 KB (10 suggestions, each ~150 bytes)<br>
+Total: (100K × 1.5KB) = 150 Gbps (ingress negligible, egress matters)<br>
+Reasonable: 1-2 Gbps with compression and regional caching
+            </div>
+
+            <h3>Trie Update Cost</h3>
+            <div class="formula">
+New terms per day: ~100K (1 term per 50M queries, typical for search)<br>
+Frequency updates: All 5M terms get new popularity scores<br>
+Weekly batch job: Read 5M terms, recompute scores, rebuild trie, deploy<br>
+Time: ~30 min (MapReduce on 100-node cluster)<br>
+Cost: ~$50-100/run, twice weekly = ~$300-500/week
+            </div>
+        </section>
+
+        <!-- HIGH-LEVEL ARCHITECTURE -->
+        <section id="architecture" class="section-ref">
+            <h2>High-Level Architecture</h2>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 1200 500" width="100%" height="auto">
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+                        </marker>
+                        <marker id="arrowD" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Client Cluster -->
+                    <rect x="20" y="30" width="180" height="140" fill="#f0f0f0" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3" rx="4"/>
+                    <text x="35" y="50" font-size="12" font-weight="bold" fill="#1a1a1a">Client</text>
+                    <rect x="30" y="65" width="160" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="110" y="95" text-anchor="middle" font-weight="bold" font-size="13" fill="#1a1a1a">Browser/Mobile</text>
+
+                    <!-- Edge Cluster -->
+                    <rect x="240" y="30" width="220" height="140" fill="#f0f0f0" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3" rx="4"/>
+                    <text x="255" y="50" font-size="12" font-weight="bold" fill="#1a1a1a">Edge</text>
+                    <rect x="250" y="65" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="300" y="95" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">API Gateway</text>
+                    <rect x="360" y="65" width="90" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="405" y="95" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Load Balancer</text>
+
+                    <!-- App Cluster -->
+                    <rect x="500" y="30" width="180" height="140" fill="#f0f0f0" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3" rx="4"/>
+                    <text x="515" y="50" font-size="12" font-weight="bold" fill="#1a1a1a">App</text>
+                    <rect x="520" y="65" width="140" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="590" y="95" text-anchor="middle" font-weight="bold" font-size="13" fill="#1a1a1a">Suggestion Service</text>
+
+                    <!-- Data Cluster -->
+                    <rect x="730" y="30" width="440" height="140" fill="#f0f0f0" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3" rx="4"/>
+                    <text x="745" y="50" font-size="12" font-weight="bold" fill="#1a1a1a">Data</text>
+                    <rect x="750" y="65" width="130" height="50" fill="white" stroke="#9c27b0" stroke-width="2" rx="6"/>
+                    <text x="815" y="88" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Redis Cache</text>
+                    <text x="815" y="105" text-anchor="middle" font-size="10" fill="#666">(hot prefixes)</text>
+                    <rect x="900" y="65" width="130" height="50" fill="white" stroke="#ff9800" stroke-width="2" rx="6"/>
+                    <text x="965" y="88" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Cassandra DB</text>
+                    <text x="965" y="105" text-anchor="middle" font-size="10" fill="#666">(trie snapshots)</text>
+                    <rect x="1050" y="65" width="100" height="50" fill="white" stroke="#fbc02d" stroke-width="2" rx="6"/>
+                    <text x="1100" y="88" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Kafka</text>
+                    <text x="1100" y="105" text-anchor="middle" font-size="10" fill="#666">(events)</text>
+
+                    <!-- Solid Arrows: Main flow -->
+                    <line x1="200" y1="90" x2="250" y2="90" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="215" y="80" font-size="11" fill="#555">HTTP/HTTPS</text>
+
+                    <line x1="460" y1="90" x2="500" y2="90" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="470" y="80" font-size="11" fill="#555">gRPC</text>
+
+                    <line x1="640" y1="90" x2="730" y2="90" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="675" y="80" font-size="11" fill="#555">read/write</text>
+
+                    <!-- Dashed Arrows: Async paths -->
+                    <line x1="590" y1="140" x2="1100" y2="180" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="750" y="155" font-size="10" fill="#666">async analytics</text>
+
+                    <line x1="1100" y1="210" x2="780" y2="280" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="900" y="250" font-size="10" fill="#666">trie updates</text>
+
+                    <!-- Timeline/Process on right -->
+                    <text x="20" y="280" font-weight="bold" font-size="13" fill="#1a1a1a">Request Flow Pipeline</text>
+                    <text x="20" y="310" font-size="11" fill="#333">1. Client sends GET /suggest?q=prefix</text>
+                    <text x="20" y="335" font-size="11" fill="#333">2. Gateway routes to Suggestion Service (gRPC)</text>
+                    <text x="20" y="360" font-size="11" fill="#333">3. Service checks Redis cache (O(1) hit rate ~90%)</text>
+                    <text x="20" y="385" font-size="11" fill="#333">4. Cache miss → query Cassandra trie (dashed arrows)</text>
+                    <text x="20" y="410" font-size="11" fill="#333">5. Kafka streams query events for offline ranking updates</text>
+                    <text x="20" y="435" font-size="11" fill="#333">6. Weekly batch job rebuilds trie, blue-green deploy</text>
+                </svg>
+            </div>
+
+            <h3>Component Breakdown</h3>
+
+            <p><strong>Client Layer:</strong> Web/mobile apps that debounce user input (100-200ms) before sending requests to reduce QPS. XHR or WebSocket for real-time suggestions.</p>
+
+            <p><strong>API Gateway:</strong> Load balances requests across suggestion servers. Implements rate limiting (e.g., 1000 req/sec per user), request validation, and routing. Talks to DNS for service discovery.</p>
+
+            <p><strong>Suggestion Service (Stateless):</strong> Core logic tier. Receives prefix, checks Redis cache first (90% hit rate), falls back to Cassandra trie lookup, ranks results, and returns JSON. Horizontally scalable; 10-20 instances per region. Caches recently built Trie objects in process memory for faster traversals.</p>
+
+            <p><strong>Redis Cache:</strong> Stores hot 1-3 character prefixes → JSON array of top-10 suggestions + scores. TTL=1 hour (auto-refresh before expiry). Cluster mode for high availability; ~3-4 GB per region.</p>
+
+            <p><strong>Cassandra Cluster:</strong> Persistent Trie snapshots. Each node holds range of terms (e.g., "a"-"az", "ba"-"bz"). Schema: <span class="metric">key = trie_version, value = serialized_trie_binary</span>. Weak consistency model acceptable (eventual consistency fine for stale suggestions). 3x replication across availability zones.</p>
+
+            <p><strong>Kafka Queue:</strong> Ingests query events (prefix, user_id, timestamp, result_size). Stream processors aggregate counts by prefix hourly. Enables trending analysis, model training, and behavior analytics.</p>
+
+            <p><strong>Stream Processor & Batch Jobs:</strong> Daily: recompute top-10 suggestions per prefix using popularity + recency decay. Weekly: scan Kafka logs for new terms, rebuild Trie, blue-green deploy to Cassandra. MapReduce on Hadoop cluster; ~30 min per run.</p>
+        </section>
+
+        <!-- CORE DATA STRUCTURE: TRIE -->
+        <section id="trie" class="section-ref">
+            <h2>Core Data Structure: Trie</h2>
+
+            <p>
+                A <strong>Trie</strong> (prefix tree) is the foundational data structure. Each node represents a character; paths encode strings. We augment each node with <strong>top-10 suggestions and scores</strong> to avoid full tree traversal.
+            </p>
+
+            <h3>TrieNode Class (Python)</h3>
+            <div class="code-block">
+<span class="keyword">class</span> <span class="class">TrieNode</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self):
+        self.children = {}  <span class="comment"># char → TrieNode</span>
+        self.is_end_of_word = <span class="keyword">False</span>
+        self.frequency = <span class="number">0</span>  <span class="comment"># Global frequency of this term</span>
+        self.top_suggestions = []  <span class="comment"># List[Tuple[str, score]]</span>
+
+    <span class="keyword">def</span> <span class="function">insert</span>(self, word: str, freq: int):
+        <span class="comment">"""Insert word into trie; update top_suggestions at each node."""</span>
+        node = self
+        <span class="keyword">for</span> char <span class="keyword">in</span> word:
+            <span class="keyword">if</span> char <span class="keyword">not</span> <span class="keyword">in</span> node.children:
+                node.children[char] = TrieNode()
+            node = node.children[char]
+
+            <span class="comment"># Update top-10 at this node</span>
+            node.top_suggestions.append((word, freq))
+            node.top_suggestions.sort(key=<span class="keyword">lambda</span> x: -x[<span class="number">1</span>])
+            node.top_suggestions = node.top_suggestions[:10]
+
+        node.is_end_of_word = <span class="keyword">True</span>
+        node.frequency = freq
+
+    <span class="keyword">def</span> <span class="function">search</span>(self, prefix: str) -> List[Tuple[str, int]]:
+        <span class="comment">"""Search prefix; return top-10 suggestions."""</span>
+        node = self
+        <span class="keyword">for</span> char <span class="keyword">in</span> prefix:
+            <span class="keyword">if</span> char <span class="keyword">not</span> <span class="keyword">in</span> node.children:
+                <span class="keyword">return</span> []
+            node = node.children[char]
+        <span class="keyword">return</span> node.top_suggestions[:10]
+            </div>
+
+            <h3>Complexity Analysis</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Operation</th>
+                        <th>Time Complexity</th>
+                        <th>Space Complexity</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Insert word</td>
+                        <td>O(m) where m = word length</td>
+                        <td>O(m)</td>
+                        <td>Traverse m characters; update top-10 at each level</td>
+                    </tr>
+                    <tr>
+                        <td>Search prefix</td>
+                        <td>O(m) + O(1)</td>
+                        <td>O(1)</td>
+                        <td>Traverse m chars; return cached top-10 at final node</td>
+                    </tr>
+                    <tr>
+                        <td>Delete word</td>
+                        <td>O(m)</td>
+                        <td>O(1)</td>
+                        <td>Mark as not end-of-word; clean up empty branches</td>
+                    </tr>
+                    <tr>
+                        <td>Autocomplete</td>
+                        <td>O(m + 1)</td>
+                        <td>O(1)</td>
+                        <td>Search + return cached list; super fast!</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Memory Layout</h3>
+            <div class="formula">
+Per TrieNode:
+  - children dict (HashMap): ~48 bytes (Python object overhead) + 8 bytes per child entry × ~26 = ~256 bytes
+  - is_end_of_word: 1 byte
+  - frequency: 8 bytes (long)
+  - top_suggestions: 10 × (string ref + score) = 10 × 16 bytes = 160 bytes
+  Total per node: ~425 bytes
+
+For 5M unique terms, avg word length 8:
+  - Total nodes: ~5M × 8 = 40M nodes
+  - Total memory: 40M × 425 bytes ≈ 17 GB (uncompressed in memory)
+  - Serialized (gzip): ~2-3 GB in Cassandra
+            </div>
+
+            <p>
+                <strong>Key optimization:</strong> Pre-compute and cache top-10 suggestions at every node during trie rebuild. This turns a search query into a single O(m) traversal + O(1) array return, eliminating expensive graph traversals.
+            </p>
+        </section>
+
+        <!-- RANKING & SCORING -->
+        <section id="ranking" class="section-ref">
+            <h2>Ranking & Scoring Algorithm</h2>
+
+            <h3>Scoring Formula</h3>
+            <div class="formula">
+score = (popularity_score × 0.6) + (recency_score × 0.3) + (personalization_score × 0.1)
+
+where:
+  popularity_score = log₁₀(1 + query_count_past_week)  [0-5 range]
+  recency_score = 1 / (1 + days_since_peak × decay_factor)  [0-1]
+  decay_factor = 0.5 (halves score every 14 days)
+  personalization_score = [0,1] if user has search history, else 0
+            </div>
+
+            <h3>Recency Decay Function</h3>
+            <div class="code-block">
+<span class="keyword">def</span> <span class="function">recency_score</span>(days_since_peak: float, decay_factor: float = <span class="number">0.5</span>) -> float:
+    <span class="comment">"""Exponential decay for trending terms."""</span>
+    <span class="keyword">return</span> decay_factor ** (days_since_peak / <span class="number">14</span>)
+
+<span class="comment"># Example: Term peaked 14 days ago → score = 0.5</span>
+<span class="comment"># Term peaked 28 days ago → score = 0.25</span>
+<span class="comment"># New term (0 days) → score = 1.0</span>
+            </div>
+
+            <h3>Algorithm Comparison</h3>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Approach</th>
+                        <th>Pros</th>
+                        <th>Cons</th>
+                        <th>Recommendation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Pure Frequency</strong><br>(count only)</td>
+                        <td>Simple, fast</td>
+                        <td>Stale results; past events dominate</td>
+                        <td>❌ Avoid</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Time-Decay</strong><br>(exponential)</td>
+                        <td>Captures trends; current events boosted</td>
+                        <td>Ignores all-time popularity</td>
+                        <td>⚠️ Use as blend</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BM25 Variant</strong><br>(TF-IDF style)</td>
+                        <td>Query-aware scoring; statistical sound</td>
+                        <td>Expensive to compute at scale; slower ranking</td>
+                        <td>⚠️ For offline ranking</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ML Ranking</strong><br>(neural network)</td>
+                        <td>Captures complex signals; state-of-art</td>
+                        <td>High latency; model serving overhead</td>
+                        <td>⭐ Future work; not for MVP</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weighted Blend</strong><br>(popularity + recency)</td>
+                        <td>Balances stability + trends; fast; interpretable</td>
+                        <td>Requires tuning weights</td>
+                        <td>✅ <strong>Recommended</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout insight">
+                <strong>Key Insight:</strong> Pre-compute scores offline during batch trie rebuild, not at query time. Bake scores into top-10 suggestions at each prefix node. This makes queries O(m) + O(1) return, avoiding real-time ML inference.
+            </div>
+        </section>
+
+        <!-- DATABASE & PERSISTENCE -->
+        <section id="database" class="section-ref">
+            <h2>Database & Persistence</h2>
+
+            <h3>Why Cassandra for Trie Storage?</h3>
+            <ul>
+                <li><strong>Write-optimized:</strong> Weekly trie rebuilds write 100s of GB efficiently; LSM tree structure</li>
+                <li><strong>Distributed:</strong> Scales horizontally; 3x replication across AZs for durability</li>
+                <li><strong>Eventual consistency:</strong> Acceptable for this use case; stale suggestions are okay</li>
+                <li><strong>TTL support:</strong> Auto-delete old trie versions; keeps disk usage bounded</li>
+                <li><strong>Range queries:</strong> Scan trie snapshots by version; support blue-green deploys</li>
+                <li><strong>Operational maturity:</strong> Battle-tested at scale (Netflix, Uber, Airbnb)</li>
+            </ul>
+
+            <h3>Cassandra Schema</h3>
+            <div class="code-block">
+<span class="keyword">CREATE TABLE</span> typeahead.trie_snapshots (
+    version <span class="keyword">TEXT</span>,                     <span class="comment">-- e.g., "v202403-en"</span>
+    language_code <span class="keyword">TEXT</span>,               <span class="comment">-- e.g., "en", "es", "fr"</span>
+    partition_key <span class="keyword">INT</span>,                <span class="comment">-- 0-99 for sharding across nodes</span>
+    trie_binary <span class="keyword">BLOB</span>,                  <span class="comment">-- Gzipped serialized trie</span>
+    created_at <span class="keyword">TIMESTAMP</span>,
+    <span class="keyword">PRIMARY KEY</span> (version, language_code, partition_key)
+) <span class="keyword">WITH</span> CLUSTERING ORDER BY (language_code ASC, partition_key ASC)
+  <span class="keyword">AND</span> default_time_to_live = <span class="number">604800</span>;  <span class="comment">-- 7 days</span>
+            </div>
+
+            <h3>Serialization Format</h3>
+            <div class="formula">
+Binary Trie Format:
+  [Header: 8 bytes]
+    - magic: "TRIE" (4 bytes)
+    - version: 1 (2 bytes)
+    - term_count: uint32 (4 bytes)
+  [Nodes: variable]
+    - For each node in DFS pre-order:
+      [char: 1 byte] [is_end: 1 bit] [score: float32: 4 bytes]
+      [child_count: varint: 1-3 bytes] [top_suggestions: 10 × (string_offset, score)]
+  [String Pool: variable]
+    - Deduplicated terms; offsets in nodes point here
+
+Compression: gzip reduces 500GB → 50-100GB
+Serialization: 30 seconds (Python pickle) or 5 seconds (Protobuf/FlatBuffers)
+            </div>
+
+            <h3>Snapshot Strategy</h3>
+            <ol>
+                <li><strong>Weekly Full Snapshot:</strong> Sunday 2 AM UTC. Rebuild entire trie from logs. File size ~100 GB (gzipped). Deploy to staging Cassandra cluster first.</li>
+                <li><strong>Blue-Green Deployment:</strong> Keep two active Cassandra versions (e.g., v202403-en, v202410-en). Write to green; once verified, flip traffic. If issues, rollback to blue.</li>
+                <li><strong>TTL Auto-Cleanup:</strong> Set TTL=7 days. Old snapshots auto-delete; bound disk usage at ~500 GB per language.</li>
+                <li><strong>Incremental Updates:</strong> Daily ranking updates (popularity scores) stored separately in Redis (cheaper than Cassandra writes). Baked into next weekly trie rebuild.</li>
+            </ol>
+
+            <div class="callout tip">
+                <strong>Tip:</strong> Version trie snapshots by date + language (v202403-en, v202403-es). Store both in Cassandra under same table; use version + language_code as composite key for fast lookups.
+            </div>
+        </section>
+
+        <!-- CACHING LAYER -->
+        <section id="caching" class="section-ref">
+            <h2>Caching Layer</h2>
+
+            <h3>Redis Data Model</h3>
+            <div class="formula">
+Key: "{language}:{prefix}"  [e.g., "en:ap"]
+Value: JSON array of suggestions
+  [
+    {"term": "apple", "score": 4.82},
+    {"term": "app", "score": 4.71},
+    ...
+  ]
+
+Size per entry: ~500-800 bytes
+Hot prefixes (1-3 chars): ~3,500 keys × 800 bytes = 2.8 GB per language
+Hot prefixes (4 chars): ~17K keys × 1.2 KB = 20.4 GB (too much; skip caching)
+            </div>
+
+            <h3>Cache Population Strategy</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Trigger</th>
+                        <th>Timing</th>
+                        <th>Implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Pre-warm on trie deploy</td>
+                        <td>Before blue-green flip</td>
+                        <td>Batch job: iterate 1-3 char prefixes, pre-compute suggestions, bulk insert to Redis</td>
+                    </tr>
+                    <tr>
+                        <td>Lazy cache-miss</td>
+                        <td>On every query miss</td>
+                        <td>Suggestion service: compute from Cassandra trie, write to Redis with TTL</td>
+                    </tr>
+                    <tr>
+                        <td>Refresh before expiry</td>
+                        <td>Every hour (TTL=1 hr)</td>
+                        <td>Background job: poll hot prefixes, check TTL, refresh if &lt; 15 min left</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>TTL Strategy</h3>
+            <div class="formula">
+TTL = 1 hour (3600 seconds)
+
+Reasoning:
+  - Popularity scores updated daily; 1-hour staleness acceptable
+  - Popular prefixes refreshed in background before expiry (avoid thundering herd)
+  - Unpopular 4+ char prefixes not cached; recomputed on-demand
+  - Warm prefixes (e.g., "a", "the") always cached via refresh job
+            </div>
+
+            <h3>Hit Rate Optimization</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tactic</th>
+                        <th>Expected Hit Rate Lift</th>
+                        <th>Implementation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Aggressive 1-char prefix caching</td>
+                        <td>+40%</td>
+                        <td>26 entries; always keep in Redis; refresh every 30 min</td>
+                    </tr>
+                    <tr>
+                        <td>Top-1000 queries pre-cached</td>
+                        <td>+30%</td>
+                        <td>Global trending; update every 6 hours from logs</td>
+                    </tr>
+                    <tr>
+                        <td>User-specific overlays (personalization)</td>
+                        <td>+15%</td>
+                        <td>Cache per-user prefix→suggestions; 5-min TTL; size limit 100 MB</td>
+                    </tr>
+                    <tr>
+                        <td>Predictive prefetch</td>
+                        <td>+5%</td>
+                        <td>On prefix "ap" query, pre-fetch "app", "apple" in background</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p><strong>Target hit rate:</strong> >90%. At 100K QPS, 10% cache miss = 10K cache misses/sec. Cassandra trie lookups at 10K/sec is manageable but risks overload. Invest in warming.</p>
+
+            <div class="callout warning">
+                <strong>Warning:</strong> Cache stampede risk. If prefix expires mid-peak traffic (e.g., "vote" during election day), all 10K/sec requests hit Cassandra simultaneously. Mitigate with: (1) background refresh job, (2) probabilistic early expiry + refresh, (3) cache lock pattern.
+            </div>
+        </section>
+
+        <!-- TRIE UPDATE PIPELINE -->
+        <section id="pipeline" class="section-ref">
+            <h2>Trie Update Pipeline</h2>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 1200 620" width="100%" height="auto">
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+                        </marker>
+                        <marker id="arrowD" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Top: Trie Update Pipeline -->
+                    <text x="20" y="35" font-weight="bold" font-size="14" fill="#1a1a1a">Trie Update Pipeline (Weekly Rebuild)</text>
+
+                    <!-- User Queries -->
+                    <rect x="20" y="60" width="120" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="80" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">User Queries</text>
+
+                    <!-- Kafka Stream -->
+                    <line x1="140" y1="85" x2="200" y2="85" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="160" y="75" font-size="10" fill="#666">Kafka stream</text>
+
+                    <!-- Stream Aggregator -->
+                    <rect x="200" y="60" width="130" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="265" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Stream Aggregator</text>
+
+                    <!-- Hourly -->
+                    <line x1="330" y1="85" x2="390" y2="85" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="350" y="75" font-size="10" fill="#666">hourly</text>
+
+                    <!-- Frequency Store -->
+                    <rect x="390" y="60" width="120" height="50" fill="white" stroke="#9c27b0" stroke-width="2" rx="6"/>
+                    <text x="450" y="85" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Frequency Store</text>
+                    <text x="450" y="103" text-anchor="middle" font-size="10" fill="#666">(Redis)</text>
+
+                    <!-- Daily -->
+                    <line x1="510" y1="85" x2="570" y2="85" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="530" y="75" font-size="10" fill="#666">daily batch</text>
+
+                    <!-- MapReduce Job -->
+                    <rect x="570" y="60" width="130" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="635" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">MapReduce Job</text>
+
+                    <!-- Next -->
+                    <line x1="700" y1="85" x2="760" y2="85" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+
+                    <!-- New Trie Builder -->
+                    <rect x="760" y="60" width="130" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="825" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">New Trie Builder</text>
+
+                    <!-- Next -->
+                    <line x1="890" y1="85" x2="950" y2="85" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+
+                    <!-- Staging Trie -->
+                    <rect x="950" y="60" width="110" height="50" fill="white" stroke="#ff9800" stroke-width="2" rx="6"/>
+                    <text x="1005" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Staging Trie</text>
+
+                    <!-- Blue-Green Deploy (Solid) -->
+                    <line x1="1060" y1="85" x2="1120" y2="85" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="1080" y="75" font-size="10" fill="#333">blue-green</text>
+
+                    <!-- Live Trie -->
+                    <rect x="1120" y="60" width="130" height="50" fill="white" stroke="#4caf50" stroke-width="2" rx="6"/>
+                    <text x="1185" y="82" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Live Trie</text>
+                    <text x="1185" y="100" text-anchor="middle" font-size="10" fill="#666">(Cassandra)</text>
+
+                    <!-- MapReduce Details Section -->
+                    <text x="20" y="170" font-weight="bold" font-size="13" fill="#1a1a1a">MapReduce Job Details (Hadoop)</text>
+
+                    <!-- MapReduce flow: horizontal -->
+                    <rect x="20" y="190" width="110" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="75" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Input: 7d logs</text>
+
+                    <line x1="130" y1="215" x2="170" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="170" y="190" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="220" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Mapper</text>
+                    <text x="220" y="230" text-anchor="middle" font-size="9" fill="#666">count freq</text>
+
+                    <line x1="270" y1="215" x2="310" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="310" y="190" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="360" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Shuffle</text>
+                    <text x="360" y="230" text-anchor="middle" font-size="9" fill="#666">sort by term</text>
+
+                    <line x1="410" y1="215" x2="450" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="450" y="190" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="500" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Reducer</text>
+                    <text x="500" y="230" text-anchor="middle" font-size="9" fill="#666">merge scores</text>
+
+                    <line x1="550" y1="215" x2="590" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="590" y="190" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="640" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Filter</text>
+                    <text x="640" y="230" text-anchor="middle" font-size="9" fill="#666">freq > 100</text>
+
+                    <line x1="690" y1="215" x2="730" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="730" y="190" width="100" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="780" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Serialize</text>
+                    <text x="780" y="230" text-anchor="middle" font-size="9" fill="#666">Trie Gzip</text>
+
+                    <line x1="830" y1="215" x2="870" y2="215" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <rect x="870" y="190" width="120" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="930" y="215" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Output: Trie</text>
+                    <text x="930" y="230" text-anchor="middle" font-size="9" fill="#666">~100 GB gzip</text>
+
+                    <!-- Cache & Ranking Updates (smaller flow) -->
+                    <text x="20" y="310" font-weight="bold" font-size="13" fill="#1a1a1a">Hot Ranking Updates (Hourly)</text>
+
+                    <rect x="20" y="330" width="100" height="50" fill="white" stroke="#fbc02d" stroke-width="2" rx="6"/>
+                    <text x="70" y="360" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Kafka Stream</text>
+
+                    <line x1="120" y1="355" x2="170" y2="355" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="135" y="345" font-size="9" fill="#666">realtime</text>
+
+                    <rect x="170" y="330" width="130" height="50" fill="white" stroke="#9c27b0" stroke-width="2" rx="6"/>
+                    <text x="235" y="360" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Score Cache</text>
+                    <text x="235" y="375" text-anchor="middle" font-size="9" fill="#666">(Redis TTL 1h)</text>
+
+                    <line x1="300" y1="355" x2="340" y2="355" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="315" y="345" font-size="9" fill="#333">serve</text>
+
+                    <rect x="340" y="330" width="140" height="50" fill="white" stroke="#4caf50" stroke-width="2" rx="6"/>
+                    <text x="410" y="360" text-anchor="middle" font-weight="bold" font-size="11" fill="#1a1a1a">Live Suggestions</text>
+                    <text x="410" y="375" text-anchor="middle" font-size="9" fill="#666">(to clients)</text>
+
+                    <!-- Notes -->
+                    <text x="20" y="450" font-weight="bold" font-size="12" fill="#1a1a1a">Key Features</text>
+                    <text x="20" y="475" font-size="11" fill="#333">• Frequency threshold: > 100 queries (excludes typos, noise)</text>
+                    <text x="20" y="500" font-size="11" fill="#333">• Sampling: ~1% of queries if QPS > 10K (cost control)</text>
+                    <text x="20" y="525" font-size="11" fill="#333">• Deduplication: normalize case, remove diacritics (café = cafe)</text>
+                    <text x="20" y="550" font-size="11" fill="#333">• Weekly rebuild ensures fresh vocabulary, minimal latency during deploy</text>
+                    <text x="20" y="575" font-size="11" fill="#333">• Hourly updates to Redis cache keep trending results fresh</text>
+                </svg>
+            </div>
+
+            <h3>Pipeline Timeline</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Frequency</th>
+                        <th>Task</th>
+                        <th>Duration</th>
+                        <th>Output</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Real-time</strong></td>
+                        <td>Stream queries to Kafka topic (async)</td>
+                        <td>&lt; 1 sec</td>
+                        <td>Query event logged; available in 7-day window</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hourly</strong></td>
+                        <td>Stream processor: aggregate hourly counts by prefix</td>
+                        <td>~10 min</td>
+                        <td>Counters in Kafka topics; used for trending analysis</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Daily (2 AM UTC)</strong></td>
+                        <td>Recompute top-10 ranking per prefix; update Redis</td>
+                        <td>~15 min</td>
+                        <td>New scores in Redis; used in next trie rebuild</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Weekly (Sunday 2 AM)</strong></td>
+                        <td>MapReduce: rebuild entire trie (new vocab + scores)</td>
+                        <td>~30 min</td>
+                        <td>New trie version uploaded to staging Cassandra</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Post-rebuild</strong></td>
+                        <td>Validation: unit tests, canary traffic (1%), P99 latency check</td>
+                        <td>~30 min</td>
+                        <td>Pass/fail; if pass, flip to production</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>MapReduce Pseudocode</h3>
+            <div class="code-block">
+<span class="comment"># Hadoop MapReduce job for weekly trie rebuild</span>
+
+<span class="keyword">def</span> <span class="function">mapper</span>(key, line):
+    <span class="comment"># Input: Kafka log entry {prefix, timestamp, user_id, ...}</span>
+    data = parse_json(line)
+    prefix = normalize(data[<span class="string">'prefix'</span>])
+    timestamp = data[<span class="string">'timestamp'</span>]
+    <span class="keyword">yield</span> prefix, (<span class="number">1</span>, timestamp)
+
+<span class="keyword">def</span> <span class="function">reducer</span>(prefix, values):
+    <span class="comment"># Aggregate: count occurrences, compute score</span>
+    count = <span class="keyword">sum</span>(v[<span class="number">0</span>] <span class="keyword">for</span> v <span class="keyword">in</span> values)
+    latest_ts = max(v[<span class="number">1</span>] <span class="keyword">for</span> v <span class="keyword">in</span> values)
+    <span class="keyword">if</span> count > <span class="number">100</span>:  <span class="comment"># Frequency threshold</span>
+        score = compute_score(count, latest_ts)
+        <span class="keyword">yield</span> prefix, (term, score)
+
+<span class="comment"># Post-reducer: Sort by score, build trie</span>
+<span class="keyword">def</span> <span class="function">build_trie</span>(sorted_terms):
+    trie = TrieNode()
+    <span class="keyword">for</span> term, score <span class="keyword">in</span> sorted_terms:
+        trie.insert(term, score)
+    <span class="keyword">return</span> gzip_serialize(trie)
+            </div>
+
+            <div class="callout tip">
+                <strong>Tip:</strong> Run a canary deployment: deploy new trie to 1% of suggestion service instances. Compare latency, cache hit rate, error rate vs. old trie for 1 hour. If metrics match, flip 100%.
+            </div>
+        </section>
+
+        <!-- REQUEST PATH DEEP DIVE -->
+        <section id="requestpath" class="section-ref">
+            <h2>Request Path Deep Dive</h2>
+
+            <div class="diagram-container">
+                <svg viewBox="0 0 1200 700" width="100%" height="auto">
+                    <defs>
+                        <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+                        </marker>
+                        <marker id="arrowD" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+                        </marker>
+                    </defs>
+
+                    <!-- Title -->
+                    <text x="20" y="35" font-weight="bold" font-size="14" fill="#1a1a1a">Request Flow: Cache HIT Path (90% of requests)</text>
+
+                    <!-- Client -->
+                    <rect x="30" y="60" width="110" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="85" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Client</text>
+
+                    <!-- Arrow: type -->
+                    <line x1="140" y1="85" x2="190" y2="85" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="155" y="75" font-size="10" fill="#333">type 'ap'</text>
+
+                    <!-- API Gateway -->
+                    <rect x="190" y="60" width="130" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="255" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">API Gateway</text>
+
+                    <!-- Arrow: GET request -->
+                    <line x1="320" y1="85" x2="400" y2="85" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="345" y="75" font-size="10" fill="#333">GET /suggest?q=ap</text>
+
+                    <!-- Suggestion Service -->
+                    <rect x="400" y="60" width="150" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="475" y="90" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Suggestion Service</text>
+
+                    <!-- Arrow: Redis GET -->
+                    <line x1="550" y1="85" x2="630" y2="85" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="575" y="75" font-size="10" fill="#333">REDIS GET ap:*</text>
+
+                    <!-- Redis Cache -->
+                    <rect x="630" y="60" width="130" height="50" fill="white" stroke="#9c27b0" stroke-width="2" rx="6"/>
+                    <text x="695" y="82" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Redis Cache</text>
+                    <text x="695" y="100" text-anchor="middle" font-size="10" fill="#666">(hot prefixes)</text>
+
+                    <!-- HIT: Return arrow -->
+                    <line x1="630" y1="140" x2="475" y2="160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="550" y="155" font-size="10" fill="#4caf50" font-weight="bold">HIT: [apple,app,api]</text>
+
+                    <!-- Service to Client: 200 OK -->
+                    <line x1="400" y1="140" x2="255" y2="160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="310" y="155" font-size="10" fill="#333">200 OK</text>
+
+                    <!-- Client receives -->
+                    <line x1="190" y1="140" x2="85" y2="160" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="120" y="155" font-size="10" fill="#333">render</text>
+
+                    <!-- Highlight HIT zone -->
+                    <rect x="20" y="50" width="1160" height="130" fill="none" stroke="#4caf50" stroke-width="2" stroke-dasharray="5,3" rx="4"/>
+                    <text x="40" y="195" font-size="11" fill="#4caf50" font-weight="bold">Cache HIT Path (~90% of requests): P50 latency ~120ms</text>
+
+                    <!-- MISS Path: Alternative flow below -->
+                    <text x="20" y="245" font-weight="bold" font-size="14" fill="#1a1a1a">Cache MISS Path (10% of requests) - Fallback to Cassandra</text>
+
+                    <!-- Client -->
+                    <rect x="30" y="270" width="110" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="85" y="300" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Client</text>
+
+                    <!-- Arrow -->
+                    <line x1="140" y1="295" x2="190" y2="295" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <!-- API Gateway -->
+                    <rect x="190" y="270" width="130" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="255" y="300" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">API Gateway</text>
+
+                    <!-- Arrow -->
+                    <line x1="320" y1="295" x2="400" y2="295" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+
+                    <!-- Suggestion Service -->
+                    <rect x="400" y="270" width="150" height="50" fill="white" stroke="#333" stroke-width="2" rx="6"/>
+                    <text x="475" y="300" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Suggestion Service</text>
+
+                    <!-- Dashed arrow: Redis MISS -->
+                    <line x1="550" y1="295" x2="630" y2="295" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="570" y="285" font-size="9" fill="#ff9800" font-weight="bold">MISS</text>
+
+                    <!-- Redis Cache -->
+                    <rect x="630" y="270" width="130" height="50" fill="white" stroke="#9c27b0" stroke-width="2" rx="6"/>
+                    <text x="695" y="292" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Redis Cache</text>
+                    <text x="695" y="310" text-anchor="middle" font-size="10" fill="#ff9800">MISS!</text>
+
+                    <!-- Dashed arrow: Cassandra lookup -->
+                    <line x1="760" y1="295" x2="850" y2="295" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="790" y="285" font-size="9" fill="#ff9800">trie lookup</text>
+
+                    <!-- Cassandra -->
+                    <rect x="850" y="270" width="130" height="50" fill="white" stroke="#ff9800" stroke-width="2" rx="6"/>
+                    <text x="915" y="292" text-anchor="middle" font-weight="bold" font-size="12" fill="#1a1a1a">Cassandra Trie</text>
+                    <text x="915" y="310" text-anchor="middle" font-size="10" fill="#666">(cold path)</text>
+
+                    <!-- Dashed arrow back: Return + cache SET -->
+                    <line x1="850" y1="350" x2="550" y2="350" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+                    <text x="680" y="340" font-size="9" fill="#ff9800">results + cache SET</text>
+
+                    <!-- Dashed back to Service -->
+                    <line x1="475" y1="350" x2="475" y2="320" stroke="#666" stroke-width="1.5" fill="none" stroke-dasharray="6,3" marker-end="url(#arrowD)"/>
+
+                    <!-- Service to Client: 200 OK -->
+                    <line x1="400" y1="320" x2="255" y2="340" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="310" y="335" font-size="10" fill="#333">200 OK</text>
+
+                    <!-- Client receives -->
+                    <line x1="190" y1="340" x2="85" y2="360" stroke="#333" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                    <text x="120" y="355" font-size="10" fill="#333">render</text>
+
+                    <!-- Highlight MISS zone -->
+                    <rect x="20" y="260" width="1160" height="130" fill="none" stroke="#ff9800" stroke-width="2" stroke-dasharray="5,3" rx="4"/>
+                    <text x="40" y="405" font-size="11" fill="#ff9800" font-weight="bold">Cache MISS Path (~10% of requests): P99 latency ~150ms (Cassandra lookup adds ~35ms)</text>
+
+                    <!-- Latency Summary -->
+                    <text x="20" y="465" font-weight="bold" font-size="13" fill="#1a1a1a">Latency Budget Summary (with typical network RTT 5-15ms)</text>
+
+                    <!-- Summary boxes -->
+                    <rect x="20" y="485" width="560" height="190" fill="#f0f7ff" stroke="#0066cc" stroke-width="1.5" rx="4"/>
+                    <text x="40" y="510" font-weight="bold" font-size="12" fill="#0066cc">Cache HIT (90% of requests)</text>
+                    <text x="40" y="535" font-size="11" fill="#333">• Debounce: 100ms (client-side batching)</text>
+                    <text x="40" y="560" font-size="11" fill="#333">• Network to API Gateway: 5ms</text>
+                    <text x="40" y="585" font-size="11" fill="#333">• Redis lookup: 5-10ms (sub-microsecond in-memory)</text>
+                    <text x="40" y="610" font-size="11" fill="#333">• Serialization + Network back: 10ms</text>
+                    <text x="40" y="635" font-size="12" fill="#0066cc" font-weight="bold">Total P50: ~130ms | P99: ~180ms</text>
+
+                    <rect x="600" y="485" width="560" height="190" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5" rx="4"/>
+                    <text x="620" y="510" font-weight="bold" font-size="12" fill="#ff9800">Cache MISS (10% of requests)</text>
+                    <text x="620" y="535" font-size="11" fill="#333">• Debounce: 100ms (client-side batching)</text>
+                    <text x="620" y="560" font-size="11" fill="#333">• Network to API Gateway: 5ms</text>
+                    <text x="620" y="585" font-size="11" fill="#333">• Redis miss + Cassandra lookup: 35-50ms</text>
+                    <text x="620" y="610" font-size="11" fill="#333">• Cache SET + Serialization: 5-10ms</text>
+                    <text x="620" y="635" font-size="12" fill="#ff9800" font-weight="bold">Total P99: ~150-200ms</text>
+                </svg>
+            </div>
+
+            <h3>Request Flow (Step-by-step)</h3>
+            <ol>
+                <li><strong>User Input:</strong> User types "ap" in search box. Browser debounces for 100ms to batch rapid key presses.</li>
+                <li><strong>XHR/Fetch:</strong> After debounce, client sends <span class="metric">GET /api/suggestions?prefix=ap&lang=en&limit=10</span></li>
+                <li><strong>API Gateway:</strong> Request hits load balancer; routed to least-loaded suggestion service instance (5ms network).</li>
+                <li><strong>Service: Redis Cache:</strong>
+                    <ul style="margin-left: 48px;">
+                        <li><strong>HIT (90%):</strong> Service queries Redis for key <span class="metric">en:ap</span>. Gets 10 pre-ranked suggestions in 5ms. Returns JSON immediately.</li>
+                        <li><strong>MISS (10%):</strong> Key not in cache. Fall through to Cassandra.</li>
+                    </ul>
+                </li>
+                <li><strong>Service: Cassandra Trie Lookup (cache miss only):</strong>
+                    <ul style="margin-left: 48px;">
+                        <li>Service queries Cassandra for current trie version snapshot.</li>
+                        <li>Trie is memory-mapped; traverse "a" → "p" nodes (2 hops, O(m)).</li>
+                        <li>Fetch top-10 suggestions from final node (pre-computed at trie build time).</li>
+                        <li>Time: 30-40ms (Cassandra latency + deserialization).</li>
+                    </ul>
+                </li>
+                <li><strong>Cache Warmth (miss path):</strong> Write result back to Redis with TTL=1 hour. Future queries for "ap" hit cache.</li>
+                <li><strong>Response Serialization:</strong> Convert suggestions to JSON. ~1.5 KB response.</li>
+                <li><strong>Network to Client:</strong> Send response (5-15ms latency).</li>
+                <li><strong>Client Render:</strong> Browser renders dropdown. User sees suggestions ~120-150ms after typing.</li>
+            </ol>
+
+            <div class="callout insight">
+                <strong>Key Insight:</strong> The latency budget is dominated by network round-trips. To hit p99 &lt; 100ms, you need: (1) aggressive caching (≥90% hit rate), (2) low-latency cache (Redis in-memory), (3) regional deployment (CDN edge caches in user regions). Computation is negligible.
+            </div>
+        </section>
+
+        <!-- PARTITIONING STRATEGY -->
+        <section id="partitioning" class="section-ref">
+            <h2>Partitioning Strategy</h2>
+
+            <h3>Challenge: Hotspot Distribution</h3>
+            <p>
+                Queries follow a Zipfian distribution: "the", "a", "and" dominate. English has ~3,500 hot 1-3 char prefixes, but their popularity is extremely skewed. "a" gets 10x more queries than "z".
+            </p>
+
+            <h3>Approach 1: First-Letter Sharding (Simple but Flawed)</h3>
+            <div class="formula">
+Partition key = first_character_of_prefix
+
+Partitions:
+  - Partition "a": all prefixes starting with "a" (e.g., "a", "ap", "app", "apple")
+  - Partition "b": all prefixes starting with "b"
+  - ...
+  - Partition "z": all prefixes starting with "z"
+
+Storage per partition: ~50 GB (average)
+Query distribution: Highly skewed
+  - Partition "a": 15% of all queries
+  - Partition "b": 12% of all queries
+  - Partition "z": 0.5% of all queries
+
+Problem: Letter "a" partition overloaded; "z" underutilized.
+            </div>
+
+            <h3>Approach 2: Consistent Hashing (Better)</h3>
+            <div class="formula">
+Partition key = hash(prefix) mod 256
+
+Benefits:
+  - Distributes load evenly despite Zipfian queries
+  - Can add/remove partitions; only 1/N data reshuffles
+  - Hot prefixes scattered across partitions, reducing single-partition bottleneck
+
+Trade-offs:
+  - Must hash each prefix; adds 1-2ms latency
+  - Cache coherence harder (Redis cluster mode required)
+
+Ideal: 256 partitions across 32 servers = 8 partitions per server.
+            </div>
+
+            <h3>Approach 3: Hybrid (Recommended)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Hot set:</strong> 1-3 char prefixes</td>
+                        <td>Keep fully cached in Redis cluster (all nodes). ~3.4 GB memory. No hashing needed; always fast hit.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Warm set:</strong> 4 char prefixes</td>
+                        <td>Consistent hash across 64 partitions. Cache misses fetch from Cassandra; write to local Redis replica.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cold set:</strong> 5+ char prefixes</td>
+                        <td>On-demand Cassandra lookups. Don't cache (too many combinations). Rare queries anyway.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Virtual Nodes for Load Balancing</h3>
+            <div class="formula">
+Instead of single partition per node, use virtual nodes:
+  - Physical server: "suggestion-server-01"
+  - Virtual partitions: [vn-0, vn-1, vn-2, ..., vn-7]  (8 vnodes per physical node)
+  - When adding server: move 8 vnodes from existing servers; only 8/256 data reshuffles
+
+Benefits:
+  - Smooth scaling
+  - Better load distribution
+  - Fault tolerance: if one server fails, load spreads across multiple others
+            </div>
+
+            <div class="callout warning">
+                <strong>Warning:</strong> Avoid naive sharding by first-letter. "a" partition becomes hot, maxing out CPU/network. Use consistent hashing with virtual nodes to distribute load.
+            </div>
+        </section>
+
+        <!-- PERSONALIZATION LAYER -->
+        <section id="personalization" class="section-ref">
+            <h2>Personalization Layer</h2>
+
+            <h3>Design: Global Suggestions + Per-User Overlay</h3>
+            <div class="formula">
+Global suggestions (from global trie/cache):
+  Input: "ap"
+  Output: ["apple", "app", "api", "apply", ...]  (global top-10)
+
+Per-user overlay (user history):
+  User has searched: "apple pie", "apple watch", "apple store"
+  User's boosted: ["apple", "apple watch", "apple pie", ...]
+
+Blended result (weighted merge):
+  score_final = 0.7 × global_score + 0.3 × user_score
+
+Return: Merged top-10 by final score
+            </div>
+
+            <h3>Implementation</h3>
+            <div class="code-block">
+<span class="keyword">def</span> <span class="function">get_suggestions</span>(prefix: str, user_id: str) -> List[Suggestion]:
+    <span class="comment"># 1. Get global suggestions (from cache)</span>
+    global_sugg = redis_get(<span class="string">f"{lang}:{prefix}"</span>)  <span class="comment"># O(1)</span>
+    <span class="keyword">if</span> <span class="keyword">not</span> global_sugg:
+        global_sugg = cassandra_trie_lookup(prefix)  <span class="comment"># O(m)</span>
+
+    <span class="comment"># 2. Get user's search history (optional; only if user_id provided)</span>
+    user_history = redis_get(<span class="string">f"user_history:{user_id}"</span>)  <span class="comment"># TTL: 30 days</span>
+    user_suggestions = filter_by_prefix(user_history, prefix)
+
+    <span class="comment"># 3. Blend scores</span>
+    blended = {}
+    <span class="keyword">for</span> term, global_score <span class="keyword">in</span> global_sugg:
+        user_score = get_user_score(term, user_suggestions)
+        blended[term] = <span class="number">0.7</span> × global_score + <span class="number">0.3</span> × user_score
+
+    <span class="comment"># 4. Sort and return top-10</span>
+    <span class="keyword">return</span> sorted(blended.items(), key=<span class="keyword">lambda</span> x: -x[<span class="number">1</span>])[:10]
+            </div>
+
+            <h3>Privacy Considerations</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Concern</th>
+                        <th>Mitigation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>User search history stored server-side</td>
+                        <td>Hash user_id → anonymized ID before storing. Use client-side storage (IndexedDB) for non-sensitive history.</td>
+                    </tr>
+                    <tr>
+                        <td>History leakage if Redis compromised</td>
+                        <td>Encrypt search history in Redis. Use TLS 1.3 for all transit.</td>
+                    </tr>
+                    <tr>
+                        <td>User profiling across sessions</td>
+                        <td>Implement strict data retention (30-day TTL). Allow users to clear history. Anonymize batch analytics.</td>
+                    </tr>
+                    <tr>
+                        <td>Personalization biases</td>
+                        <td>Monitor fairness metrics. Blend user history with global trends to avoid over-personalization.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout tip">
+                <strong>Tip:</strong> For MVP, implement personalization client-side. Store history in browser localStorage. Skip server-side user history; use only global suggestions. Reduces privacy concerns and server complexity. Later, add opt-in server-side history if users demand it.
+            </div>
+        </section>
+
+        <!-- MULTI-LANGUAGE SUPPORT -->
+        <section id="multilang" class="section-ref">
+            <h2>Multi-Language Support</h2>
+
+            <h3>Challenge: Unicode Handling & Separate Tries</h3>
+            <p>
+                Different languages require different ranking (English queries dominate US users, Spanish for Latin America). Unicode normalization is critical: "café", "cafè", "cafe" should match the same token.
+            </p>
+
+            <h3>Architecture: Separate Trie per Language</h3>
+            <div class="formula">
+Storage per language:
+  - English (en): 5M terms, 500 GB
+  - Spanish (es): 3M terms, 300 GB
+  - French (fr): 2M terms, 200 GB
+  - German (de): 2M terms, 200 GB
+  - Chinese (zh): 1M terms, 100 GB  (fewer terms due to complexity)
+  - Total: ~1.3 TB (highly compressible)
+
+Cassandra schema:
+  CREATE TABLE trie_snapshots (
+    version TEXT,           -- "v202403"
+    language_code TEXT,     -- "en", "es", "fr", "de", "zh"
+    partition_key INT,
+    trie_binary BLOB,
+    ...
+  )
+
+Redis naming:
+  - en:ap → English prefix "ap"
+  - es:ap → Spanish prefix "ap"
+  - fr:ap → French prefix "ap"
+            </div>
+
+            <h3>Unicode Normalization</h3>
+            <div class="code-block">
+<span class="keyword">import</span> unicodedata
+
+<span class="keyword">def</span> <span class="function">normalize_query</span>(query: str, language: str) -> str:
+    <span class="comment"># 1. Unicode normalization (NFD = decomposed)</span>
+    normalized = unicodedata.normalize(<span class="string">'NFD'</span>, query.lower())
+
+    <span class="comment"># 2. Remove accents</span>
+    normalized = <span class="string">''</span>.join(
+        c <span class="keyword">for</span> c <span class="keyword">in</span> normalized
+        <span class="keyword">if</span> unicodedata.category(c) != <span class="string">'Mn'</span>  <span class="comment"># Mn = mark, non-spacing</span>
+    )
+
+    <span class="comment"># 3. Language-specific rules</span>
+    <span class="keyword">if</span> language == <span class="string">'de'</span>:
+        normalized = normalized.replace(<span class="string">'ü'</span>, <span class="string">'ue'</span>)  <span class="comment"># German: ü → ue</span>
+
+    <span class="keyword">return</span> normalized
+
+<span class="comment"># Examples:</span>
+<span class="comment"># normalize_query("Café", "en") → "cafe"</span>
+<span class="comment"># normalize_query("Straße", "de") → "strasse"  (ß → ss)</span>
+            </div>
+
+            <h3>Language Detection & Routing</h3>
+            <p>
+                User's language inferred from: (1) browser Accept-Language header, (2) user account settings, (3) IP geolocation. API parameter: <span class="metric">?lang=en</span>. Service routes to appropriate Cassandra partition + Redis keys.
+            </p>
+
+            <h3>Resource Implications</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Storage:</strong> ~1.3 TB for 6 languages</td>
+                        <td>vs. 500 GB for English only. +160% cost.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trie Rebuild Time:</strong> 30 min → 45 min (6x slower)</td>
+                        <td>Rebuild all 6 tries in parallel; marginal slowdown.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cache Size:</strong> +5x (1 per language)</td>
+                        <td>Hot 1-3 char prefixes per language. ~17 GB Redis total.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Operations Complexity:</strong> Deploy 6 tries instead of 1</td>
+                        <td>Automated pipeline handles parallel deploys. Negligible overhead.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout note">
+                <strong>Note:</strong> Start with English only (5M terms). Add Spanish/French once system is stable. Chinese requires special handling (pinyin indexing); defer if not core market.
+            </div>
+        </section>
+
+        <!-- FAILURE MODES & MITIGATIONS -->
+        <section id="failuremodes" class="section-ref">
+            <h2>Failure Modes & Mitigations</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Failure</th>
+                        <th>Impact</th>
+                        <th>Detection</th>
+                        <th>Mitigation</th>
+                        <th>Recovery</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Redis Cluster Down</strong></td>
+                        <td>100% cache miss. Queries hit Cassandra; latency 10x. P99 → 500ms.</td>
+                        <td>Redis connection timeout; cache hit rate → 0% in Prometheus.</td>
+                        <td>Cassandra trie stays in memory; fallback single-threaded lookups. Degrade gracefully.</td>
+                        <td>Restart Redis cluster (10 min). Warm cache from Cassandra snapshot (30 min).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cassandra Cluster Down</strong></td>
+                        <td>Cache miss queries fail. Redis hits expire; no fallback.</td>
+                        <td>Cassandra RPC timeout; error rate → 100% on misses.</td>
+                        <td>Serve stale cache (expired Redis entries). Return "try again" to client.</td>
+                        <td>Restore Cassandra from backup (1-2 hours). Serve stale results in interim.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trie Rebuild Corrupted</strong></td>
+                        <td>Deploy bad trie → invalid suggestions or crashes.</td>
+                        <td>Canary traffic errors; P99 latency spikes; exception rate &gt; 1%.</td>
+                        <td>Canary validation gates before production flip. Automated regression tests.</td>
+                        <td>Rollback to previous trie version. No data loss; revert to blue instance.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Network Partition</strong><br>(region isolation)</td>
+                        <td>Service can't reach Redis/Cassandra. Requests time out.</td>
+                        <td>Network latency → &gt;500ms. Packet loss &gt; 5%.</td>
+                        <td>Use local cache replica (async sync). Reduce timeouts (TCP fast retransmit).</td>
+                        <td>Restore network. Resync cache from Cassandra.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Hotkey Explosion</strong><br>("OK" query load 10x overnight)</td>
+                        <td>Single Redis key overloaded. Latency spike; node max out.</td>
+                        <td>Redis: key hit rate spike for 1 prefix. QPS/key → 10K.</td>
+                        <td>Redis cluster: replicate hot keys across nodes. Use read-only replicas.</td>
+                        <td>Add more Redis nodes; reshard. Scale horizontally.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Kafka Queue Backlog</strong><br>(stream processor slow)</td>
+                        <td>Query logs not aggregated; rankings stale. Trie refresh delayed.</td>
+                        <td>Kafka consumer lag &gt; 1 hour. Daily ranking job starts late.</td>
+                        <td>Auto-scale stream processor. Skip low-frequency events (sampling).</td>
+                        <td>Catch up processing. Manual trigger trie rebuild if urgently needed.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Typo/Spam Injection</strong><br>(garbage terms in trie)</td>
+                        <td>Trie quality degrades; bad suggestions. User experience hurt.</td>
+                        <td>Trending dashboard shows unusual terms. User complaints via support.</td>
+                        <td>Frequency threshold (&gt;100 queries); manual curation list; spam filter ML model.</td>
+                        <td>Rebuild trie without bad terms. Deploy next day.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Personalization Data Leak</strong><br>(private search history exposed)</td>
+                        <td>User privacy breach. Regulatory/PR crisis.</td>
+                        <td>Security audit; anomalous data access patterns; user reports.</td>
+                        <td>Encrypt user history at rest (AES-256). Strict RBAC for data access.</td>
+                        <td>Notify affected users. Audit logs for forensics. Update GDPR disclosures.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="callout warning">
+                <strong>Warning:</strong> Test failover scenarios in staging. Redis failure + Cassandra latency spike can cause cascading failures. Set aggressive timeouts (500ms) to fail fast and reduce tail latency.
+            </div>
+        </section>
+
+        <!-- TRADE-OFFS & ALTERNATIVES -->
+        <section id="tradeoffs" class="section-ref">
+            <h2>Trade-offs & Alternatives</h2>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Design Choice</th>
+                        <th>Your Recommendation</th>
+                        <th>Alternative(s)</th>
+                        <th>Why Not Alternative?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Trie as core DS</strong></td>
+                        <td>✅ Trie</td>
+                        <td>Sorted list, suffix tree, hash + set</td>
+                        <td>Trie: O(m) exact match; O(1) top-10 return. Sorted list O(log n) per query (slower). Suffix tree overkill.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Ranking algorithm</strong></td>
+                        <td>✅ Weighted blend<br>(popularity + recency)</td>
+                        <td>Pure frequency, time-decay only, ML model</td>
+                        <td>Pure frequency: misses trends. Time-decay: ignores legacy popularity. ML: too slow at inference time (100ms SLA).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cache layer</strong></td>
+                        <td>✅ Redis (1-3 char only)</td>
+                        <td>Memcached, local process cache, CDN edge</td>
+                        <td>Memcached: no Cluster mode; complex failover. Local cache: inconsistent across servers. CDN: extra latency + integration complexity.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Persistent storage</strong></td>
+                        <td>✅ Cassandra</td>
+                        <td>HBase, DynamoDB, PostgreSQL</td>
+                        <td>HBase: requires Hadoop; operational burden. DynamoDB: expensive at 5B QPS. PostgreSQL: not write-optimized for weekly full trie uploads.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trie update freq</strong></td>
+                        <td>✅ Weekly full rebuild</td>
+                        <td>Daily incremental, real-time updates</td>
+                        <td>Daily: high compute cost. Real-time: requires distributed trie merges; complexity spike.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Partitioning strategy</strong></td>
+                        <td>✅ Consistent hashing<br>(hot set global)</td>
+                        <td>First-letter sharding, range sharding</td>
+                        <td>First-letter: "a" hotspot overloaded. Range sharding: similar hotspot issues.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Personalization scope</strong></td>
+                        <td>✅ Per-user overlay<br>(blended scores)</td>
+                        <td>Pure global (no personalization), per-user full ranking</td>
+                        <td>No personalization: less relevant for users. Full per-user ranking: too slow (real-time merge expensive).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Typo tolerance</strong></td>
+                        <td>✅ Not in MVP;<br>add later if data shows need</td>
+                        <td>Fuzzy matching (edit distance), phonetic (Soundex), spell-correct ML</td>
+                        <td>Fuzzy matching: expensive (scales as O(m × d) where d = alphabet). Worth it only if 5%+ queries have typos.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Decision Framework: Why These Choices?</h3>
+            <ol>
+                <li><strong>Scalability:</strong> Trie + cache hits handle 100K QPS with <100ms latency. Simpler structures fail at scale.</li>
+                <li><strong>Cost:</strong> Cassandra's LSM trees make weekly bulk writes efficient. Real-time updates would need Kafka consumers + Redis updates constantly; expensive.</li>
+                <li><strong>Operational Simplicity:</strong> Weekly batch trie rebuild is predictable, easy to monitor, and trivial to rollback (blue-green).</li>
+                <li><strong>Accuracy:</strong> Weighted blend of popularity + recency is interpretable, fast, and good enough. ML models overkill for MVP.</li>
+            </ol>
+        </section>
+
+        <!-- INTERVIEW PLAYBOOK -->
+        <section id="playbook" class="section-ref">
+            <h2>Interview Playbook: 45-Minute Walkthrough</h2>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time (min)</th>
+                        <th>What to Say / Do</th>
+                        <th>Key Numbers to Memorize</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>0-2</strong></td>
+                        <td><strong>Clarify Requirements.</strong> Ask: scale (5B queries/day?), latency SLA (&lt;100ms p99?), multi-language? Confirm scope: search queries, global (Google-scale).</td>
+                        <td>5B queries/day = 58K QPS average = 100K QPS peak</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2-5</strong></td>
+                        <td><strong>High-Level Design.</strong> Draw architecture: Client → (debounce) → API Gateway → Suggestion Service → [Redis | Cassandra]. Explain each tier's role in 1-2 sentences.</td>
+                        <td>90% cache hit rate, &lt;5ms Redis, &lt;30ms Cassandra</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5-10</strong></td>
+                        <td><strong>Capacity Estimation.</strong> Walk through: 5B/day = 58K QPS, cache size ~3GB (3,500 hot prefixes × 800 bytes), trie size ~500GB (5M terms × 100 bytes), network ~1 Gbps.</td>
+                        <td>3.5K hot prefixes, 5M terms, 500GB storage, 100K QPS peak</td>
+                    </tr>
+                    <tr>
+                        <td><strong>10-15</strong></td>
+                        <td><strong>Core Data Structure: Trie.</strong> Code: TrieNode with children dict + top-10 suggestions. Complexity: O(m) search. Advantage: pre-computed top-10 at every node → O(m) + O(1) autocomplete.</td>
+                        <td>O(m) where m = prefix length (&lt;20), space ~425 bytes/node × 40M nodes = 17GB</td>
+                    </tr>
+                    <tr>
+                        <td><strong>15-18</strong></td>
+                        <td><strong>Ranking Algorithm.</strong> Score = 0.6×popularity + 0.3×recency + 0.1×personalization. Popularity = log₁₀(1+count). Recency = exponential decay (halves every 14 days).</td>
+                        <td>Weighted blend, decay factor=0.5/14d, weights=[0.6,0.3,0.1]</td>
+                    </tr>
+                    <tr>
+                        <td><strong>18-22</strong></td>
+                        <td><strong>Database & Persistence.</strong> Cassandra: 3x replication, TTL=7d cleanup, weekly snapshots. Why not PostgreSQL? LSM tree write-optimized for bulk loads. Schema: (version, language_code, partition_key) → trie_binary (gzipped).</td>
+                        <td>Cassandra, gzip 500GB→50GB, 3x replication, 7d TTL</td>
+                    </tr>
+                    <tr>
+                        <td><strong>22-26</strong></td>
+                        <td><strong>Caching Layer.</strong> Redis stores hot 1-3 char prefixes. Key={lang}:{prefix}, value=JSON array of 10 suggestions. TTL=1 hour. Hit rate &gt;90%. Pre-warm before deploy.</td>
+                        <td>Redis cluster, 3.4GB memory, &lt;5ms latency, 90% hit rate, 1h TTL</td>
+                    </tr>
+                    <tr>
+                        <td><strong>26-32</strong></td>
+                        <td><strong>Update Pipeline.</strong> Real-time: Kafka logs queries. Hourly: stream aggregator counts prefixes. Daily: recompute top-10 rankings. Weekly: MapReduce rebuild trie, canary test, blue-green flip.</td>
+                        <td>Weekly schedule, MapReduce 30min, 100K new terms/week, frequency threshold &gt;100</td>
+                    </tr>
+                    <tr>
+                        <td><strong>32-35</strong></td>
+                        <td><strong>Request Path & Latency.</strong> p50 ~80ms (hit path): 100ms debounce + 5ms network + 5ms Redis + 5ms network back. p99 ~100ms (occasional miss adds 30ms Cassandra). Dominated by network round-trips.</td>
+                        <td>p50=80ms, p99=100ms, debounce=100ms, RTT=10ms, cache=5ms, DB=30ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>35-40</strong></td>
+                        <td><strong>Failure Modes & Trade-offs.</strong> Redis down? Cascade to Cassandra (graceful degrade). Trie corrupted? Blue-green rollback. Hotkey spike? Consistent hashing + virtual nodes distribute load. Typos? Not in MVP; add if &gt;5% queries affected.</td>
+                        <td>Blue-green deploys, consistent hashing, 5% typo threshold, virtual nodes</td>
+                    </tr>
+                    <tr>
+                        <td><strong>40-45</strong></td>
+                        <td><strong>Follow-ups & Polish.</strong> Interviewer likely asks: (1) Multi-language? Separate tries per language. (2) Personalization? Per-user overlay with global trie. (3) Spellcheck? Fuzzy matching (deferred, add if data supports). (4) Monitoring? Cache hit rate, P99 latency, error rate.</td>
+                        <td>6 languages = 6 tries, personalization = blended scores, spellcheck = future work, monitor [hit rate, latency, errors]</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Common Follow-Up Questions & Answers</h3>
+
+            <div class="callout note">
+                <strong>Q: What if Redis fails?</strong><br>
+                <strong>A:</strong> Degrade gracefully. Cassandra trie stays hot in memory (pre-load on startup). Cache misses hit Cassandra; latency goes from 5ms → 30ms. Error rate stays 0% but P99 → 150ms. Acceptable SLA breach for hours until Redis recovers. Have automated alerts to page on-call; restore in 10 min via cluster failover.
+            </div>
+
+            <div class="callout note">
+                <strong>Q: How do you handle typos (e.g., "appl" → "apple")?</strong><br>
+                <strong>A:</strong> Not in MVP. Requires expensive fuzzy matching (Levenshtein distance = O(m×n)). Only worth implementing if &gt;5% of queries have typos (monitor in logs). If needed, pre-compute edit-distance neighbors during trie build; store alongside suggestions.
+            </div>
+
+            <div class="callout note">
+                <strong>Q: What's the freshness of suggestions?</strong><br>
+                <strong>A:</strong> Weekly vocabulary (new terms added), daily scores (popularity updated). So a trending query from Monday hits trie by Sunday. Acceptable lag for autocomplete (user searches for old term, sees older popularity rank).
+            </div>
+
+            <div class="callout note">
+                <strong>Q: How do you avoid cache stampede on hotkeys?</strong><br>
+                <strong>A:</strong> (1) Background refresh job: check TTLs on hot prefixes; refresh before expiry. (2) Probabilistic early expiry: when key TTL &lt; 15 min, trigger async refresh. (3) Cache lock: first miss acquires lock, recomputes, others wait. Redis Redlock pattern.
+            </div>
+
+            <div class="callout note">
+                <strong>Q: How do you support multi-language?</strong><br>
+                <strong>A:</strong> Separate trie per language (en, es, fr, de, zh). Cassandra key = (version, language_code, partition). Redis key = {language}:{prefix}. Detect language from browser Accept-Language header or user setting. Total storage ~1.3 TB for 6 languages.
+            </div>
+
+            <div class="callout note">
+                <strong>Q: Why Cassandra over DynamoDB?</strong><br>
+                <strong>A:</strong> DynamoDB pricing: 5B queries/day → RCU/WCU costs $1M+/month. Cassandra self-hosted: commodity hardware, 3x replication on 30 nodes = $10-20K/month ops cost. Also, Cassandra LSM trees optimized for our weekly bulk trie writes (bulk loading). DynamoDB better for transactional workloads.
+            </div>
+
+            <h3>Key Numbers to Memorize</h3>
+            <div class="formula">
+Capacity:
+  - 5 billion queries/day = 57,870 QPS average
+  - 100K QPS peak (7x average)
+  - 5 million unique search terms
+  - ~3,500 hot 1-3 char prefixes
+
+Latency:
+  - p50: ~80ms
+  - p99: &lt;100ms
+  - Debounce: 100-200ms
+  - Redis hit: 5ms
+  - Cassandra miss: 30ms
+  - Network RTT: 5-10ms
+
+Storage:
+  - Trie: 500 GB uncompressed
+  - Trie: 50-100 GB gzipped
+  - Cache (Redis): 3.4 GB per language
+  - Cassandra 3x replication: 300-600 GB total
+
+Cache:
+  - Hit rate target: &gt;90%
+  - TTL: 1 hour
+  - Memory per entry: 500-800 bytes
+  - Refresh frequency: hourly (ahead of expiry)
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Mobile sidebar toggle
+        const toggleBtn = document.querySelector('.toggle-sidebar');
+        const sidebar = document.querySelector('.sidebar');
+
+        toggleBtn?.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+
+        // Detect mobile
+        if (window.innerWidth <= 768) {
+            document.body.classList.add('mobile');
+        }
+
+        // Smooth scroll and active link tracking
+        const tocLinks = document.querySelectorAll('.toc a');
+        const sections = document.querySelectorAll('[id]');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop - 150) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            tocLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href').includes(current)) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // Smooth scroll on click
+        tocLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = document.querySelector(link.getAttribute('href'));
+                target.scrollIntoView({ behavior: 'smooth' });
+                if (window.innerWidth <= 768) {
+                    sidebar.classList.remove('open');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
