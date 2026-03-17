@@ -97,9 +97,9 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**TLS/SSL & Encryption**](study-guide/06%20-%20Security%20%26%20Compliance/02%20-%20TLS%20and%20SSL%20Encryption.pdf) | Securing data in transit & at rest | Certificates, Key management, Perfect Forward Secrecy, Client-side encryption |
 | [**Rate Limiting & Throttling**](study-guide/06%20-%20Security%20%26%20Compliance/03%20-%20Rate%20Limiting%20and%20Throttling.pdf) | Controlling request rates to prevent overload/abuse | Token Bucket, Leaky Bucket, Sliding Window counters, Quotas, DDoS protection |
 | [**API Security**](study-guide/06%20-%20Security%20%26%20Compliance/04%20-%20API%20Security.pdf) | Ensuring secure communication & preventing unauthorized API calls | HMAC, API keys, OAuth scopes, WAF (Web Application Firewall) |
-| **Secrets Management** | Storing & rotating credentials, tokens, keys | HashiCorp Vault, AWS Secrets Manager, GCP Secret Manager, KMS |
-| **Compliance & Regulations** | Adhering to standards (GDPR, HIPAA, PCI-DSS) | Data privacy, Auditing, Data retention policies, Encryption requirements |
-| **Penetration Testing & Hardening** | Identifying & fixing security vulnerabilities before exploitation | Threat modeling, Vulnerability scanning, Hardening OS & containers |
+| [**Secrets Management**](study-guide/06%20-%20Security%20%26%20Compliance/05%20-%20Secrets%20Management.pdf) | Storing & rotating credentials, tokens, keys | HashiCorp Vault, AWS Secrets Manager, GCP Secret Manager, KMS |
+| [**Compliance & Regulations**](study-guide/06%20-%20Security%20%26%20Compliance/06%20-%20Compliance%20and%20Regulations.pdf) | Adhering to standards (GDPR, HIPAA, PCI-DSS) | Data privacy, Auditing, Data retention policies, Encryption requirements |
+| [**Penetration Testing & Hardening**](study-guide/06%20-%20Security%20%26%20Compliance/07%20-%20Penetration%20Testing%20and%20Hardening.pdf) | Identifying & fixing security vulnerabilities before exploitation | Threat modeling, Vulnerability scanning, Hardening OS & containers |
 
 ---
 
