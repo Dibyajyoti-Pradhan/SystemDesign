@@ -120,17 +120,17 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 | Topic                             | Description                                                             | Focus Area|
 | --------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| **Distributed Consensus** | Achieving agreement on shared states across nodes | Paxos, Raft, ZooKeeper, Leader election, Quorum-based decisions |
-| **Gossip Protocols** | Nodes exchanging state info in a peer-to-peer manner | Eventually consistent state, Cluster membership, Anti-entropy algorithms |
+| [**Distributed Consensus**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/01%20-%20Distributed%20Consensus.pdf) | Achieving agreement on shared states across nodes | Paxos, Raft, ZooKeeper, Leader election, Quorum-based decisions |
+| [**Gossip Protocols**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/02%20-%20Gossip%20Protocols.pdf) | Nodes exchanging state info in a peer-to-peer manner | Eventually consistent state, Cluster membership, Anti-entropy algorithms |
 | [**Saga Pattern**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/07%20-%20Saga%20Pattern.pdf) | Coordinating distributed transactions via local commits & compensations | Choreography vs Orchestration, Undo steps, Error handling |
-| **Caching Strategies** | Advanced caching approaches beyond simple key-value | Write-through, Write-behind, Cache-aside, CDN edge caching, Cache busting |
-| **Data Partition Tolerance** | Techniques to handle network splits or partial outages | Primary partition detection, Failover protocols, Split-brain avoidance |
-| **Geo-Distributed Architectures** | Designing systems that span multiple geographic regions | Latency-based routing, Multi-master replication, Data sovereignty, CDN PoPs |
+| [**Caching Strategies**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/03%20-%20Caching%20Strategies.pdf) | Advanced caching approaches beyond simple key-value | Write-through, Write-behind, Cache-aside, CDN edge caching, Cache busting |
+| [**Data Partition Tolerance**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/04%20-%20Data%20Partition%20Tolerance.pdf) | Techniques to handle network splits or partial outages | Primary partition detection, Failover protocols, Split-brain avoidance |
+| [**Geo-Distributed Architectures**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/05%20-%20Geo-Distributed%20Architectures.pdf) | Designing systems that span multiple geographic regions | Latency-based routing, Multi-master replication, Data sovereignty, CDN PoPs |
 | [**Service Mesh**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/04%20-%20Service%20Mesh.pdf) | Abstracting communication + traffic management in microservices | Sidecar proxy (Envoy), mTLS between services, Advanced routing, Observability |
-| **Proxy Patterns** | Patterns for reverse/forward proxies, load balancers, SSL termination | API Gateway, Edge proxy, L4/L7 routing, Request buffering |
-| **Configuration & Feature Flags** | Dynamically turning features on/off, changing config at runtime | LaunchDarkly, Toggles, Canary testing, Gradual rollouts |
-| **Workflow Orchestration** | Managing multi-step processes or pipelines across microservices | Airflow, Cadence, Temporal, Directed Acyclic Graph (DAG) scheduling |
-| **Container Security** | Ensuring container images & runtimes are secure | Image scanning, Security contexts, SELinux/AppArmor, Namespaces, Secrets |
+| [**Proxy Patterns**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/06%20-%20Proxy%20Patterns.pdf) | Patterns for reverse/forward proxies, load balancers, SSL termination | API Gateway, Edge proxy, L4/L7 routing, Request buffering |
+| [**Configuration & Feature Flags**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/07%20-%20Configuration%20and%20Feature%20Flags.pdf) | Dynamically turning features on/off, changing config at runtime | LaunchDarkly, Toggles, Canary testing, Gradual rollouts |
+| [**Workflow Orchestration**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/08%20-%20Workflow%20Orchestration.pdf) | Managing multi-step processes or pipelines across microservices | Airflow, Cadence, Temporal, Directed Acyclic Graph (DAG) scheduling |
+| [**Container Security**](study-guide/08%20-%20Advanced%20Topics%20%26%20Patterns/09%20-%20Container%20Security.pdf) | Ensuring container images & runtimes are secure | Image scanning, Security contexts, SELinux/AppArmor, Namespaces, Secrets |
 
 ---
 
