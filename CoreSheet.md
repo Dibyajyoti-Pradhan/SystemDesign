@@ -81,11 +81,11 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**Docker & Containerization**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/01%20-%20Docker%20and%20Containerization.pdf) | Packaging apps into isolated, lightweight containers | Images, Dockerfiles, Container networking, Volume mounts |
 | [**Kubernetes (K8s)**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/02%20-%20Kubernetes.pdf) | Orchestrating containerized apps at scale | Pods, Deployments, Services, Ingress, StatefulSets, RBAC, Autoscaling |
 | [**Infrastructure as Code**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/03%20-%20Infrastructure%20as%20Code.pdf) | Managing servers/networks as code (Terraform, CloudFormation) | Declarative configs, Immutable infrastructure, Version-controlled infra |
-| **CI/CD Pipelines** | Automated build, test, and deployment processes | Jenkins, GitLab CI, GitHub Actions, Canary/BG deployments |
-| **Serverless (FaaS/BaaS)** | Running code/functions without provisioning servers | AWS Lambda, GCP Cloud Functions, Azure Functions, Event triggers, Cold starts |
-| **Config Management** | Tools for environment consistency (Ansible, Chef, Puppet) | Playbooks, Cookbooks, Manifests, Versioned configurations, Secrets management |
-| **Cloud Networking** | Designing virtual private clouds (VPC), subnets, load balancers, NAT gateways | Private vs public subnets, Security groups, Multi-region strategies |
-| **Edge Computing** | Processing data close to the source (IoT devices, local edge servers) | Data aggregation, Latency optimization, Offline/intermittent connectivity |
+| [**CI/CD Pipelines**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/04%20-%20CI-CD%20Pipelines.pdf) | Automated build, test, and deployment processes | Jenkins, GitLab CI, GitHub Actions, Canary/BG deployments |
+| [**Serverless (FaaS/BaaS)**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/05%20-%20Serverless.pdf) | Running code/functions without provisioning servers | AWS Lambda, GCP Cloud Functions, Azure Functions, Event triggers, Cold starts |
+| [**Config Management**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/06%20-%20Config%20Management.pdf) | Tools for environment consistency (Ansible, Chef, Puppet) | Playbooks, Cookbooks, Manifests, Versioned configurations, Secrets management |
+| [**Cloud Networking**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/07%20-%20Cloud%20Networking.pdf) | Designing virtual private clouds (VPC), subnets, load balancers, NAT gateways | Private vs public subnets, Security groups, Multi-region strategies |
+| [**Edge Computing**](study-guide/05%20-%20DevOps%20%26%20Infrastructure/08%20-%20Edge%20Computing.pdf) | Processing data close to the source (IoT devices, local edge servers) | Data aggregation, Latency optimization, Offline/intermittent connectivity |
 
 ---
 
