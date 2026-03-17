@@ -134,7 +134,30 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 ---
 
-## 9. **Putting It All Together**
+## 9. **AI & ML for Engineers**
+
+> Essential AI/ML knowledge for Senior SWEs and Tech Leads — focused on system design, integration, and production concerns rather than theory.
+
+| Topic                                    | Description                                                                         | Focus Area |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **ML System Design Fundamentals**        | Designing end-to-end ML systems: data → training → serving → monitoring             | Online vs offline inference, model lifecycle, train/serve skew, feedback loops |
+| **Neural Networks & Deep Learning**      | Core building blocks: layers, activations, backprop, optimizers                     | CNNs, RNNs, Transformers, regularization (dropout, batch norm), common architectures |
+| **Large Language Models (LLMs)**         | How modern LLMs work: transformers, attention, tokenization, context windows        | GPT/BERT/LLaMA families, pre-training vs fine-tuning, RLHF, instruction tuning, context limits |
+| **Embeddings & Vector Databases**        | Representing data as dense vectors; semantic search at scale                        | Word2Vec, sentence embeddings, ANN algorithms (HNSW, IVF), Pinecone, Weaviate, pgvector |
+| **Retrieval-Augmented Generation (RAG)** | Grounding LLM responses in external knowledge bases                                 | Chunking strategies, embedding + retrieval, re-ranking, hybrid search, eval metrics |
+| **Prompt Engineering**                   | Crafting inputs to elicit reliable, structured outputs from LLMs                    | System prompts, few-shot, chain-of-thought, structured output (JSON mode), prompt injection |
+| **AI Agents & Tool Use**                 | Building LLM-powered agents that plan, call tools, and take multi-step actions      | Agentic loops, tool/function calling, multi-agent orchestration, memory (short/long-term) |
+| **Fine-Tuning & PEFT**                   | Adapting pre-trained models to domain-specific tasks efficiently                    | LoRA, QLoRA, instruction tuning, RLHF, dataset curation, evaluation |
+| **MLOps & Model Lifecycle**              | Production ML: experiment tracking, versioning, deployment, and drift monitoring    | MLflow, Weights & Biases, model registry, CI/CD for ML, data/concept drift detection |
+| **Feature Stores & Data Pipelines**      | Managing features consistently across training and serving                          | Online vs offline stores, point-in-time correctness, Feast, Tecton, Spark pipelines, DVC |
+| **Model Serving & Inference Optimization** | Deploying models at scale with low latency and high throughput                    | Batching, quantization (INT8/FP16), pruning, distillation, ONNX, TensorRT, vLLM, BentoML |
+| **Recommendation Systems**              | Personalizing content/product suggestions at scale                                  | Collaborative filtering, content-based, two-tower models, matrix factorization, real-time serving |
+| **A/B Testing & Online Evaluation for ML** | Validating model changes in production safely                                    | Shadow deployment, canary rollout, interleaving, multi-armed bandits, statistical significance |
+| **Responsible AI & Governance**          | Building fair, explainable, and safe AI systems                                     | Bias & fairness metrics, SHAP/LIME explainability, model cards, red-teaming, AI safety basics |
+
+---
+
+## 10. **Putting It All Together**
 
 Use this list as a **master checklist** to guide your preparation:
 
@@ -146,5 +169,6 @@ Use this list as a **master checklist** to guide your preparation:
 6. **Security & Compliance** – Explore **authentication**, **rate limiting**, **TLS**, **secrets management**.
 7. **Observability & Monitoring** – Logging, metrics, tracing, and chaos engineering.
 8. **Advanced Topics & Patterns** – **Distributed consensus**, **geo-distributed** architectures, **workflow orchestration**.
+9. **AI & ML for Engineers** – **LLMs**, **RAG**, **vector databases**, **MLOps**, **model serving**, **agents**.
 
 Mark off topics as you **study and practice**. By covering these **comprehensive** areas, you’ll be well-prepared to design, build, **scale**, and **secure** complex systems in real-world scenarios. Good luck!
