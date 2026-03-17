@@ -54,8 +54,8 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | [**DNS**](study-guide/03%20-%20Networking%20%26%20Communication/02%20-%20DNS.pdf) | Translating domain names to IP addresses | Recursive vs Authoritative, DNS caching, Anycast, GeoDNS |
 | [**WebSockets**](study-guide/03%20-%20Networking%20%26%20Communication/03%20-%20WebSockets.pdf) | Bi-directional, full-duplex communication over a single TCP connection | Socket.IO, Real-time updates, Pub/Sub patterns |
 | [**RPC Frameworks**](study-guide/03%20-%20Networking%20%26%20Communication/04%20-%20RPC%20Frameworks.pdf) | Remote Procedure Calls for microservices (gRPC, Thrift) | Protobuf, IDL (Interface Definition Language), Bi-directional streaming |
-| **Proxies & Gateways** | Mediating requests and responses for routing, security, or caching | Reverse proxies (NGINX, HAProxy), API Gateway patterns, Request rewriting |
-| **OSI & TCP/IP Layers** | Basic layering models for network communications | Layer 4 (Transport) vs Layer 7 (Application), Packet routing, NAT traversal |
+| [**Proxies & Gateways**](study-guide/03%20-%20Networking%20%26%20Communication/05%20-%20Proxies%20and%20Gateways.pdf) | Mediating requests and responses for routing, security, or caching | Reverse proxies (NGINX, HAProxy), API Gateway patterns, Request rewriting |
+| [**OSI & TCP/IP Layers**](study-guide/03%20-%20Networking%20%26%20Communication/06%20-%20OSI%20and%20TCP-IP%20Layers.pdf) | Basic layering models for network communications | Layer 4 (Transport) vs Layer 7 (Application), Packet routing, NAT traversal |
 
 ---
 
@@ -63,13 +63,13 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 | Topic                          | Description                                                         | Focus Area|
 | ------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Microservices Architecture** | Services broken into smaller components, independently deployable | Service boundaries, Data ownership, Communication (REST/gRPC), Service discovery |
-| **Monolith vs Microservices** | Comparing single cohesive codebase vs many loosely coupled services | Deployment complexity, DevOps overhead, Communication overhead, Scalability trade-offs |
-| **Event-Driven Architecture** | Building systems around asynchronous events and message flows | Event sourcing, CQRS, Broker-based vs broker-less, Pub/Sub decoupling |
-| **Service Mesh** | Abstracting network communication and adding observability/security | Istio, Linkerd, Sidecar proxies, mTLS, Circuit breakers |
-| **Domain-Driven Design (DDD)** | Modeling complex domains into bounded contexts | Ubiquitous language, Aggregates, Repositories, Entities, Value Objects |
-| **CQRS & Event Sourcing** | Separate commands from queries; store state changes as events | Projections, Write vs read models, Event replay |
-| **Saga Pattern** | Handling distributed transactions across microservices | Choreography vs orchestration, Compensating transactions, Rollbacks |
+| [**Microservices Architecture**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/01%20-%20Microservices%20Architecture.pdf) | Services broken into smaller components, independently deployable | Service boundaries, Data ownership, Communication (REST/gRPC), Service discovery |
+| [**Monolith vs Microservices**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/02%20-%20Monolith%20vs%20Microservices.pdf) | Comparing single cohesive codebase vs many loosely coupled services | Deployment complexity, DevOps overhead, Communication overhead, Scalability trade-offs |
+| [**Event-Driven Architecture**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/03%20-%20Event-Driven%20Architecture.pdf) | Building systems around asynchronous events and message flows | Event sourcing, CQRS, Broker-based vs broker-less, Pub/Sub decoupling |
+| [**Service Mesh**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/04%20-%20Service%20Mesh.pdf) | Abstracting network communication and adding observability/security | Istio, Linkerd, Sidecar proxies, mTLS, Circuit breakers |
+| [**Domain-Driven Design (DDD)**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/05%20-%20Domain-Driven%20Design.pdf) | Modeling complex domains into bounded contexts | Ubiquitous language, Aggregates, Repositories, Entities, Value Objects |
+| [**CQRS & Event Sourcing**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/06%20-%20CQRS%20and%20Event%20Sourcing.pdf) | Separate commands from queries; store state changes as events | Projections, Write vs read models, Event replay |
+| [**Saga Pattern**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/07%20-%20Saga%20Pattern.pdf) | Handling distributed transactions across microservices | Choreography vs orchestration, Compensating transactions, Rollbacks |
 | **Strangler Fig Pattern** | Incrementally migrating from monolith to microservices | Proxy approach, Routing rules, Gradual replacement of legacy components |
 
 ---
@@ -122,11 +122,11 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 | --------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | **Distributed Consensus** | Achieving agreement on shared states across nodes | Paxos, Raft, ZooKeeper, Leader election, Quorum-based decisions |
 | **Gossip Protocols** | Nodes exchanging state info in a peer-to-peer manner | Eventually consistent state, Cluster membership, Anti-entropy algorithms |
-| **Saga Pattern** | Coordinating distributed transactions via local commits & compensations | Choreography vs Orchestration, Undo steps, Error handling |
+| [**Saga Pattern**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/07%20-%20Saga%20Pattern.pdf) | Coordinating distributed transactions via local commits & compensations | Choreography vs Orchestration, Undo steps, Error handling |
 | **Caching Strategies** | Advanced caching approaches beyond simple key-value | Write-through, Write-behind, Cache-aside, CDN edge caching, Cache busting |
 | **Data Partition Tolerance** | Techniques to handle network splits or partial outages | Primary partition detection, Failover protocols, Split-brain avoidance |
 | **Geo-Distributed Architectures** | Designing systems that span multiple geographic regions | Latency-based routing, Multi-master replication, Data sovereignty, CDN PoPs |
-| **Service Mesh** | Abstracting communication + traffic management in microservices | Sidecar proxy (Envoy), mTLS between services, Advanced routing, Observability |
+| [**Service Mesh**](study-guide/04%20-%20Architecture%20Patterns%20%26%20Microservices/04%20-%20Service%20Mesh.pdf) | Abstracting communication + traffic management in microservices | Sidecar proxy (Envoy), mTLS between services, Advanced routing, Observability |
 | **Proxy Patterns** | Patterns for reverse/forward proxies, load balancers, SSL termination | API Gateway, Edge proxy, L4/L7 routing, Request buffering |
 | **Configuration & Feature Flags** | Dynamically turning features on/off, changing config at runtime | LaunchDarkly, Toggles, Canary testing, Gradual rollouts |
 | **Workflow Orchestration** | Managing multi-step processes or pipelines across microservices | Airflow, Cadence, Temporal, Directed Acyclic Graph (DAG) scheduling |
