@@ -107,12 +107,12 @@ Use these tables as a **roadmap** to ensure you don’t miss any essential topic
 
 | Topic                            | Description                                                                       | Focus Area|
 | -------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| **Logging** | Capturing and storing logs from applications & services | ELK Stack (Elasticsearch, Logstash, Kibana), Structured logs, Centralized aggregation |
-| **Metrics & Time-Series** | Collecting numeric data (CPU, memory, request counts) over time for system health | Prometheus, InfluxDB, Telegraf, Grafana dashboards, Alert thresholds |
-| **Distributed Tracing** | Tracking requests across microservices to pinpoint latency/failures | OpenTracing, Jaeger, Zipkin, B3/Tracecontext headers, Span/trace IDs |
-| **Alerting & Incident Response** | Setting up alerts and handling on-call escalations | PagerDuty, Opsgenie, Slack integration, Runbooks, Postmortems |
-| **Chaos Engineering** | Proactively injecting failures to test system resilience | Netflix Simian Army, Fault injection, Hypothesis-based testing, Steady-state checks |
-| **Monitoring Dashboards** | Visualizing real-time & historical data to detect anomalies quickly | Grafana dashboards, Kibana, Custom metrics, Business KPIs vs system metrics |
+| [**Logging**](study-guide/07%20-%20Observability%20%26%20Monitoring/01%20-%20Logging.pdf) | Capturing and storing logs from applications & services | ELK Stack (Elasticsearch, Logstash, Kibana), Structured logs, Centralized aggregation |
+| [**Metrics & Time-Series**](study-guide/07%20-%20Observability%20%26%20Monitoring/02%20-%20Metrics%20and%20Time-Series.pdf) | Collecting numeric data (CPU, memory, request counts) over time for system health | Prometheus, InfluxDB, Telegraf, Grafana dashboards, Alert thresholds |
+| [**Distributed Tracing**](study-guide/07%20-%20Observability%20%26%20Monitoring/03%20-%20Distributed%20Tracing.pdf) | Tracking requests across microservices to pinpoint latency/failures | OpenTracing, Jaeger, Zipkin, B3/Tracecontext headers, Span/trace IDs |
+| [**Alerting & Incident Response**](study-guide/07%20-%20Observability%20%26%20Monitoring/04%20-%20Alerting%20and%20Incident%20Response.pdf) | Setting up alerts and handling on-call escalations | PagerDuty, Opsgenie, Slack integration, Runbooks, Postmortems |
+| [**Chaos Engineering**](study-guide/07%20-%20Observability%20%26%20Monitoring/05%20-%20Chaos%20Engineering.pdf) | Proactively injecting failures to test system resilience | Netflix Simian Army, Fault injection, Hypothesis-based testing, Steady-state checks |
+| [**Monitoring Dashboards**](study-guide/07%20-%20Observability%20%26%20Monitoring/06%20-%20Monitoring%20Dashboards.pdf) | Visualizing real-time & historical data to detect anomalies quickly | Grafana dashboards, Kibana, Custom metrics, Business KPIs vs system metrics |
 
 ---
 
