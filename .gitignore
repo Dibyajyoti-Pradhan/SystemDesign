@@ -1,0 +1,6 @@
+# Claude Code agent worktree storage — ephemeral, not part of the repo
+.claude/
+
+# Python build artefacts
+__pycache__/
+*.pyc
