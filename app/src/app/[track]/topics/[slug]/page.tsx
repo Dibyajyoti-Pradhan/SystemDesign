@@ -14,6 +14,56 @@ import { ArrowLeft, ExternalLink, FileText, Sparkles } from "lucide-react";
 import { GenerateTopicButton } from "@/components/topic/GenerateTopicButton";
 import { parseTrack } from "@/lib/paths";
 
+/**
+ * Source-file card. Inlines the iframe only for PDFs and plain text;
+ * .docx/.doc are not browser-renderable inline so we offer a download
+ * link plus a nudge to use the Generate button.
+ */
+function SourceCard({ pdfPath, title }: { pdfPath: string; title: string }) {
+  const ext = pdfPath.toLowerCase().match(/\.([^.]+)$/)?.[1] ?? "";
+  const isPdf = ext === "pdf";
+  const isInlineText = ext === "md" || ext === "mdx" || ext === "txt";
+  const inlinable = isPdf || isInlineText;
+  const sourceLabel = ext.toUpperCase();
+  const url = `/api/pdf?path=${encodeURIComponent(pdfPath)}`;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3 flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <FileText className="h-4 w-4" /> Source {sourceLabel}
+        </CardTitle>
+        <Button variant="outline" size="sm" asChild>
+          <a href={url} target="_blank" rel="noopener">
+            <ExternalLink className="h-4 w-4" />
+            {inlinable ? "Open in new tab" : "Download"}
+          </a>
+        </Button>
+      </CardHeader>
+      {isPdf ? (
+        <CardContent className="p-0">
+          <iframe
+            src={`${url}#view=FitH`}
+            className="w-full h-[75vh] rounded-b-lg border-t"
+            title={`${title} (PDF)`}
+          />
+        </CardContent>
+      ) : (
+        <CardContent className="border-t pt-4 space-y-2">
+          <p className="text-sm text-muted-foreground">
+            {ext === "docx" || ext === "doc"
+              ? "Word documents can't preview inline — use the button above to download."
+              : `${sourceLabel} source — open in a new tab to view.`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Or hit <strong>Generate this page from PDF</strong> above to read the rich version directly.
+          </p>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 export default async function TopicPage({ params }: { params: Promise<{ track: string; slug: string }> }) {
   const { track: trackParam, slug } = await params;
   const track = parseTrack(trackParam);
@@ -100,31 +150,7 @@ export default async function TopicPage({ params }: { params: Promise<{ track: s
             </CardContent>
           </Card>
 
-          {topic.pdfPath && (
-            <Card>
-              <CardHeader className="pb-3 flex-row items-center justify-between">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileText className="h-4 w-4" /> Source PDF
-                </CardTitle>
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={`/api/pdf?path=${encodeURIComponent(topic.pdfPath)}`}
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    <ExternalLink className="h-4 w-4" /> Open in new tab
-                  </a>
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <iframe
-                  src={`/api/pdf?path=${encodeURIComponent(topic.pdfPath)}#view=FitH`}
-                  className="w-full h-[75vh] rounded-b-lg border-t"
-                  title={`${topic.title} (PDF)`}
-                />
-              </CardContent>
-            </Card>
-          )}
+          {topic.pdfPath && <SourceCard pdfPath={topic.pdfPath} title={topic.title} />}
         </div>
       )}
 

@@ -3,6 +3,15 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { REPO_ROOT } from "@/lib/paths";
 
+const CONTENT_TYPE_BY_EXT: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".doc": "application/msword",
+  ".md": "text/markdown; charset=utf-8",
+  ".mdx": "text/markdown; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+};
+
 export async function GET(req: NextRequest) {
   const rel = req.nextUrl.searchParams.get("path");
   if (!rel) return new NextResponse("Missing path", { status: 400 });
@@ -13,10 +22,15 @@ export async function GET(req: NextRequest) {
   if (!fs.existsSync(abs)) return new NextResponse("Not found", { status: 404 });
 
   const data = fs.readFileSync(abs);
+  const ext = path.extname(abs).toLowerCase();
+  const contentType = CONTENT_TYPE_BY_EXT[ext] ?? "application/octet-stream";
+  // .docx is not viewable inline — force download. PDFs and text inline.
+  const disposition = ext === ".docx" || ext === ".doc" ? "attachment" : "inline";
+
   return new NextResponse(data, {
     headers: {
-      "content-type": "application/pdf",
-      "content-disposition": `inline; filename="${path.basename(abs)}"`,
+      "content-type": contentType,
+      "content-disposition": `${disposition}; filename="${path.basename(abs)}"`,
     },
   });
 }
