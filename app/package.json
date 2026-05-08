@@ -6,12 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:fresh": "rm -rf .next tsconfig.tsbuildinfo && next build && next start",
     "typecheck": "tsc --noEmit",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
     "generate-topic": "tsx scripts/generate-topic.ts",
-    "generate-cards": "tsx scripts/generate-cards.ts"
+    "generate-cards": "tsx scripts/generate-cards.ts",
+    "test:stress": "node tests/stress.mjs",
+    "test:e2e": "node tests/e2e.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
