@@ -8,6 +8,8 @@ export { TRACKS } from "@/lib/tracks";
 export const topics = sqliteTable("topics", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   track: text("track", { enum: TRACKS }).notNull().default("system-design"),
+  /** Programming language. Only meaningful for the `coding` track; null elsewhere. */
+  language: text("language"),
   slug: text("slug").notNull().unique(),
   category: text("category").notNull(),
   categoryOrder: integer("category_order").notNull().default(0),
@@ -38,6 +40,8 @@ export const topicLinks = sqliteTable(
 export const questions = sqliteTable("questions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   track: text("track", { enum: TRACKS }).notNull().default("system-design"),
+  /** Programming language. Only meaningful for the `coding` track; null elsewhere. */
+  language: text("language"),
   slug: text("slug").notNull().unique(),
   number: integer("number"),
   title: text("title").notNull(),

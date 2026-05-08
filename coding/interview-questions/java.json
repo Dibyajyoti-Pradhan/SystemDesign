@@ -1,0 +1,22 @@
+[
+  { "number": 1,  "title": "Explain JDK vs JRE vs JVM — what does each contain and when do you reach for which?", "difficulty": "easy" },
+  { "number": 2,  "title": "Walk me through JVM memory: heap, stack, method area, PC register — what lives where?", "difficulty": "medium" },
+  { "number": 3,  "title": "How does the ClassLoader subsystem work? Bootstrap vs Extension vs Application", "difficulty": "medium" },
+  { "number": 4,  "title": "How does the JIT compiler decide what to compile? Explain tiered compilation", "difficulty": "hard" },
+  { "number": 5,  "title": "Compare HashMap and ConcurrentHashMap — internal structure and concurrency strategy", "difficulty": "medium" },
+  { "number": 6,  "title": "How does HashMap handle collisions? What changed in Java 8?", "difficulty": "medium" },
+  { "number": 7,  "title": "Why is String immutable in Java? How does the String pool work?", "difficulty": "easy" },
+  { "number": 8,  "title": "Explain the contract between equals() and hashCode(). What breaks if you violate it?", "difficulty": "medium" },
+  { "number": 9,  "title": "Compare ArrayList vs LinkedList — when would you pick each?", "difficulty": "easy" },
+  { "number": 10, "title": "Explain the Java Memory Model: happens-before, atomicity, visibility, ordering", "difficulty": "hard" },
+  { "number": 11, "title": "What is double-checked locking and why does it need volatile?", "difficulty": "hard" },
+  { "number": 12, "title": "How does CompletableFuture work? What's the common-pool footgun?", "difficulty": "hard" },
+  { "number": 13, "title": "Checked vs unchecked exceptions — when would you use each? What's the design philosophy?", "difficulty": "medium" },
+  { "number": 14, "title": "Explain generics and type erasure. Why doesn't new T[10] compile?", "difficulty": "medium" },
+  { "number": 15, "title": "Abstract class vs interface (post Java 8). When do you pick which?", "difficulty": "medium" },
+  { "number": 16, "title": "How does garbage collection work in modern JVMs? Compare G1, ZGC, Shenandoah", "difficulty": "hard" },
+  { "number": 17, "title": "Stream API — when does parallel make sense? What are the gotchas?", "difficulty": "medium" },
+  { "number": 18, "title": "Synchronized vs ReentrantLock vs ReadWriteLock vs StampedLock — when each?", "difficulty": "hard" },
+  { "number": 19, "title": "Implement a thread-safe Singleton. Walk through the options and tradeoffs", "difficulty": "medium" },
+  { "number": 20, "title": "Compare LinkedHashMap accessOrder vs insertionOrder — how would you build an LRU cache?", "difficulty": "medium" }
+]

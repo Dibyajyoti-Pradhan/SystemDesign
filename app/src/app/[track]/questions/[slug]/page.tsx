@@ -85,6 +85,7 @@ export default async function QuestionDetailPage({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="font-mono">#{String(q.number ?? 0).padStart(2, "0")}</span>
           <Badge variant="outline" className="capitalize">{q.difficulty}</Badge>
+          {q.language && <Badge variant="muted" className="capitalize">{q.language}</Badge>}
           <span className="inline-flex items-center gap-1">
             <Clock className="h-3 w-3" /> ~{q.estMinutes} min
           </span>
@@ -112,8 +113,8 @@ export default async function QuestionDetailPage({
         )}
       </div>
 
-      <section className="space-y-3">
-        {briefBody ? (
+      {briefBody ? (
+        <section className="space-y-3">
           <Card>
             <CardContent className="py-6">
               <div className="prose-system">
@@ -121,7 +122,9 @@ export default async function QuestionDetailPage({
               </div>
             </CardContent>
           </Card>
-        ) : (
+        </section>
+      ) : track === "system-design" && q.pdfPath ? (
+        <section className="space-y-3">
           <Card className="border-primary/20 bg-primary/5">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -130,14 +133,14 @@ export default async function QuestionDetailPage({
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                Generate a tight problem brief from the source PDF — only the question, never
-                the solution. Uses your Claude Code subscription. ~20–40 seconds.
+                Generate a tight problem brief from the source PDF — only the question, never the
+                solution. Uses your Claude Code subscription. ~20–40 seconds.
               </p>
               <GenerateBriefButton slug={q.slug} />
             </CardContent>
           </Card>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       {sessions.length > 0 && (
         <section className="space-y-3">

@@ -2,27 +2,47 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { topics } from "@/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { FileText, CheckCircle2, Network } from "lucide-react";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
+import { LanguageFilter } from "@/components/LanguageFilter";
 
 export default async function TopicsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ track: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }) {
   const { track: trackParam } = await params;
   const track = parseTrack(trackParam);
   if (!track) notFound();
+  const { lang } = await searchParams;
+
+  const baseWhere = eq(topics.track, track);
+  const whereClause =
+    track === "coding" && lang ? and(baseWhere, eq(topics.language, lang)) : baseWhere;
 
   const all = await db
     .select()
     .from(topics)
-    .where(eq(topics.track, track))
+    .where(whereClause)
     .orderBy(asc(topics.categoryOrder), asc(topics.topicOrder));
+
+  const languageRows =
+    track === "coding"
+      ? await db
+          .selectDistinct({ language: topics.language })
+          .from(topics)
+          .where(and(eq(topics.track, "coding"), isNotNull(topics.language)))
+      : [];
+  const availableLanguages = languageRows
+    .map((r) => r.language)
+    .filter((x): x is string => !!x)
+    .sort();
 
   const grouped = new Map<string, typeof all>();
   for (const t of all) {
@@ -48,6 +68,14 @@ export default async function TopicsPage({
           </Link>
         )}
       </header>
+
+      {track === "coding" && availableLanguages.length > 0 && (
+        <LanguageFilter
+          languages={availableLanguages}
+          activeLanguage={lang ?? null}
+          basePath={`/${track}/topics`}
+        />
+      )}
 
       {grouped.size === 0 && (
         <Card>

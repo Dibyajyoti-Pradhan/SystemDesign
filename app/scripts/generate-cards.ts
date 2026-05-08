@@ -152,8 +152,10 @@ Generate ${n} flashcards now. Return them as { "cards": [...] } per the schema.`
 
   if (!slug && !all) {
     console.error("Usage:");
-    console.error("  npx tsx scripts/generate-cards.ts <topic-slug> [--n=15]");
-    console.error("  npx tsx scripts/generate-cards.ts --all [--n=15]");
+    console.error("  npm run generate-cards -- <topic-slug> [--n=15]");
+    console.error("  npm run generate-cards -- --all [--n=15]");
+    console.error("");
+    console.error("Note the '--' separator. npm needs it to pass flags through.");
     process.exit(1);
   }
 

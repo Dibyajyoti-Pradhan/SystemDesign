@@ -69,8 +69,66 @@ async function seedTopicsForTrack(track: Track) {
   console.log(`[${track}] seeded ${inserted}/${rows.length} topics across ${new Set(rows.map((r) => r.category)).size} categories.`);
 }
 
+interface AuthoredQuestion {
+  number: number;
+  title: string;
+  difficulty?: "easy" | "medium" | "hard";
+  tags?: string[];
+}
+
 async function seedQuestionsForTrack(track: Track) {
   const root = TRACK_PATHS[track].questionsSources;
+  if (!fs.existsSync(root)) {
+    console.log(`[${track}] no questions source dir (${root}); skipping.`);
+    return;
+  }
+
+  if (track === "coding") {
+    // Coding questions are hand-authored title lists in JSON, one file per
+    // language: `coding/interview-questions/<lang>.json`. We don't generate
+    // briefs for these — the title IS the question (per user direction).
+    const files = readDir(root).filter((f) => f.toLowerCase().endsWith(".json"));
+    let total = 0;
+    for (const file of files) {
+      const lang = file.replace(/\.json$/i, "");
+      let raw: AuthoredQuestion[];
+      try {
+        raw = JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
+      } catch (e) {
+        console.error(`[coding] failed to parse ${file}:`, e);
+        continue;
+      }
+      let inserted = 0;
+      for (const q of raw) {
+        if (!q?.title || typeof q.number !== "number") continue;
+        const slug = slugify(`${lang}-${String(q.number).padStart(2, "0")}-${q.title}`);
+        try {
+          const result = await db
+            .insert(questions)
+            .values({
+              track,
+              language: lang,
+              slug,
+              number: q.number,
+              title: q.title,
+              difficulty: q.difficulty ?? "medium",
+              tags: JSON.stringify(q.tags ?? []),
+            })
+            .onConflictDoNothing()
+            .returning({ id: questions.id });
+          if (result.length > 0) inserted++;
+        } catch (e) {
+          console.error(`[coding/${lang}] question insert failed`, slug, e);
+        }
+      }
+      console.log(`[coding/${lang}] seeded ${inserted}/${raw.length} questions.`);
+      total += inserted;
+    }
+    if (files.length === 0) console.log(`[coding] no language JSON files found.`);
+    return;
+  }
+
+  // system-design: PDF-backed questions (existing behaviour)
   const files = readDir(root).filter((f) => /\.(pdf|docx|md)$/i.test(f));
   let inserted = 0;
   for (const file of files) {

@@ -96,8 +96,10 @@ Generate the MDX now.`;
 
 const arg = process.argv[2];
 if (!arg) {
-  console.error("Usage: npm run generate-topic <slug>");
-  console.error("       npm run generate-topic --all-missing");
+  console.error("Usage: npm run generate-topic -- <slug>");
+  console.error("       npm run generate-topic -- --all-missing");
+  console.error("");
+  console.error("Note the '--' separator. npm needs it to pass flags through to the script.");
   process.exit(1);
 }
 

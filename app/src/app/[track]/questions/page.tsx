@@ -2,26 +2,43 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { questions, interviewSessions } from "@/db/schema";
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray, and, isNotNull } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, MessageSquare } from "lucide-react";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
+import { LanguageFilter } from "@/components/LanguageFilter";
 
 export default async function QuestionsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ track: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }) {
   const { track: trackParam } = await params;
   const track = parseTrack(trackParam);
   if (!track) notFound();
+  const { lang } = await searchParams;
 
-  const all = await db
-    .select()
-    .from(questions)
-    .where(eq(questions.track, track))
-    .orderBy(asc(questions.number));
+  const baseWhere = eq(questions.track, track);
+  const whereClause =
+    track === "coding" && lang ? and(baseWhere, eq(questions.language, lang)) : baseWhere;
+
+  const all = await db.select().from(questions).where(whereClause).orderBy(asc(questions.number));
+
+  // Distinct languages for filter chips (coding only)
+  const languageRows =
+    track === "coding"
+      ? await db
+          .selectDistinct({ language: questions.language })
+          .from(questions)
+          .where(and(eq(questions.track, "coding"), isNotNull(questions.language)))
+      : [];
+  const availableLanguages = languageRows
+    .map((r) => r.language)
+    .filter((x): x is string => !!x)
+    .sort();
 
   const questionIds = all.map((q) => q.id);
   const sessions = questionIds.length
@@ -46,17 +63,31 @@ export default async function QuestionsPage({
         </h1>
         <p className="text-muted-foreground mt-1">
           {track === "coding"
-            ? `${TRACK_LABELS[track]} · explain-it-like-a-staff-engineer style questions.`
+            ? `${TRACK_LABELS[track]} · explain-it-like-a-staff-engineer style questions. AI-vs-AI works on the title alone — no auto-generated answers.`
             : "Pick a question to read the brief and start a session."}
         </p>
       </header>
 
+      {track === "coding" && availableLanguages.length > 0 && (
+        <LanguageFilter
+          languages={availableLanguages}
+          activeLanguage={lang ?? null}
+          basePath={`/${track}/questions`}
+        />
+      )}
+
       {empty ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            <p className="text-sm">No questions seeded for {TRACK_LABELS[track]} yet.</p>
+            <p className="text-sm">
+              {lang
+                ? `No questions for "${lang}" yet.`
+                : `No questions seeded for ${TRACK_LABELS[track]} yet.`}
+            </p>
             <p className="text-xs mt-1">
-              Drop PDFs / .docx / .md into <code className="bg-muted px-1.5 py-0.5 rounded">{track}/interview-questions/</code> and run <code className="bg-muted px-1.5 py-0.5 rounded">npm run seed</code>.
+              {track === "coding"
+                ? <>Drop a JSON file at <code className="bg-muted px-1.5 py-0.5 rounded">coding/interview-questions/&lt;lang&gt;.json</code> and run <code className="bg-muted px-1.5 py-0.5 rounded">npm run seed</code>.</>
+                : <>Drop PDFs into <code className="bg-muted px-1.5 py-0.5 rounded">{track}/design-questions/</code> and run <code className="bg-muted px-1.5 py-0.5 rounded">npm run seed</code>.</>}
             </p>
           </CardContent>
         </Card>
@@ -87,6 +118,12 @@ export default async function QuestionsPage({
                       <span className="inline-flex items-center gap-1">
                         <Clock className="h-3 w-3" /> ~{q.estMinutes} min
                       </span>
+                      {q.language && (
+                        <>
+                          <span>·</span>
+                          <span className="capitalize">{q.language}</span>
+                        </>
+                      )}
                       {past > 0 && (
                         <>
                           <span>·</span>
