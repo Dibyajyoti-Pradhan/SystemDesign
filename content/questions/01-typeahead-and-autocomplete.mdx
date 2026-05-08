@@ -1,0 +1,28 @@
+---
+title: TypeAhead and Autocomplete
+slug: 01-typeahead-and-autocomplete
+difficulty: medium
+---
+
+# Problem
+Design a search autocomplete system that returns real-time prefix-based suggestions to users as they type, at global scale across web and mobile clients.
+
+## Functional requirements
+- Given a partial query string, return top-k (5–10) suggestions in real-time
+- Support prefix matching (e.g., "ap" → apple, app, application)
+- Rank suggestions by popularity, recency, and user history
+- Refresh suggestions to reflect trending queries (at most hourly lag)
+- Support multiple languages and alphabets (Latin, Cyrillic, CJK)
+
+## Scale & non-functional
+- DAU: ~500M (5B queries/day ÷ ~10 queries per active user)
+- QPS (avg): ~58,000 QPS; peak ~111,000 QPS
+- Latency target: p99 < 50ms; p50 < 15ms
+- Storage: ~750 GB raw trie index (~2.25 TB with replication)
+- Availability: 99.95%
+
+## Out of scope
+- Typo correction / fuzzy matching
+- Full-text or semantic search beyond prefix matching
+- Real-time per-keystroke trie writes (writes are offline/batch)
+- Ads or sponsored suggestion injection

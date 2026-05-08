@@ -4,3 +4,25 @@
 # Python build artefacts
 __pycache__/
 *.pyc
+
+# macOS metadata
+.DS_Store
+**/.DS_Store
+
+# Next.js / Node app
+app/node_modules/
+app/.next/
+app/.drizzle/
+app/data/*.db
+app/data/*.db-journal
+app/data/*.db-wal
+app/data/*.db-shm
+app/.env
+app/.env.local
+app/next-env.d.ts
+app/*.tsbuildinfo
+
+# Code playgrounds (live code, not part of the study app)
+**/C++ Playground/
+**/Java Playground/
+**/Python Playground/
