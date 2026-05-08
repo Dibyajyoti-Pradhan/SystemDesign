@@ -51,14 +51,14 @@ async function generateForSlug(slug: string) {
     console.error(`No topic with slug "${slug}"`);
     process.exit(1);
   }
-  if (!topic.pdfPath) {
-    console.error(`Topic "${slug}" has no PDF source`);
-    process.exit(1);
+  let pdfText = "";
+  if (topic.pdfPath) {
+    const sourceAbs = path.join(REPO_ROOT, topic.pdfPath);
+    console.log(`[${slug}] extracting text from ${path.basename(sourceAbs)}...`);
+    pdfText = await extractSourceText(sourceAbs);
+  } else {
+    console.log(`[${slug}] no source file — generating from Claude's knowledge.`);
   }
-
-  const sourceAbs = path.join(REPO_ROOT, topic.pdfPath);
-  console.log(`[${slug}] extracting text from ${path.basename(sourceAbs)}...`);
-  const pdfText = await extractSourceText(sourceAbs);
 
   console.log(`[${slug}] calling Claude Code...`);
   const userPrompt = `Topic: ${topic.title}
@@ -67,7 +67,7 @@ Slug: ${topic.slug}
 
 Source material extracted from PDF:
 
-${pdfText.slice(0, 20000) || "(PDF extraction failed — write from your own knowledge of the topic.)"}
+${pdfText.slice(0, 20000) || "(No source content — write from your own knowledge of the topic. The user is preparing for senior/staff Java interviews; pitch accordingly.)"}
 
 Generate the MDX now.`;
 
@@ -89,9 +89,24 @@ Generate the MDX now.`;
   await fs.writeFile(outPath, cleaned, "utf8");
 
   const relPath = path.relative(CONTENT_ROOT, outPath);
-  await db.update(topics).set({ mdxPath: relPath }).where(eq(topics.id, topic.id));
-
-  console.log(`[${slug}] ✓ wrote ${outPath}`);
+  // Retry the UPDATE — under multi-process contention the first attempt
+  // can hit SQLITE_BUSY despite the busy_timeout. Tiny exponential backoff.
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await db.update(topics).set({ mdxPath: relPath }).where(eq(topics.id, topic.id));
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+    }
+  }
+  if (lastErr) {
+    console.error(`[${slug}] ✓ wrote MDX but DB UPDATE failed (will be backfilled):`, (lastErr as Error).message);
+  } else {
+    console.log(`[${slug}] ✓ wrote ${outPath}`);
+  }
 }
 
 const arg = process.argv[2];

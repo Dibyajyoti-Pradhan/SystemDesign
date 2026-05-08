@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
+    "seed:java": "tsx scripts/seed-java-sheet.ts",
+    "backfill-mdx": "tsx scripts/backfill-mdx-paths.ts",
     "generate-topic": "tsx scripts/generate-topic.ts",
     "generate-cards": "tsx scripts/generate-cards.ts",
     "test:stress": "node tests/stress.mjs",
