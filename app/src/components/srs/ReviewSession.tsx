@@ -40,7 +40,15 @@ const RATING_BUTTONS: Array<{
   { rating: 4, label: "Easy", hint: "longer", variant: "default", shortcut: "4" },
 ];
 
-export function ReviewSession({ cards, topicSlug }: { cards: ReviewCard[]; topicSlug?: string }) {
+export function ReviewSession({
+  cards,
+  topicSlug,
+  track,
+}: {
+  cards: ReviewCard[];
+  topicSlug?: string;
+  track: "system-design" | "coding";
+}) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -120,7 +128,7 @@ export function ReviewSession({ cards, topicSlug }: { cards: ReviewCard[]; topic
           </p>
           <div className="flex gap-2 justify-center pt-2">
             <Button asChild variant="outline" size="sm">
-              <Link href="/topics">Browse topics</Link>
+              <Link href={`/${track}/topics`}>Browse topics</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/cards">Pending cards</Link>
@@ -154,7 +162,7 @@ export function ReviewSession({ cards, topicSlug }: { cards: ReviewCard[]; topic
               <RotateCcw className="h-4 w-4" /> Refresh queue
             </Button>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/topics">Back to topics</Link>
+              <Link href={`/${track}/topics`}>Back to topics</Link>
             </Button>
           </div>
         </CardContent>
@@ -179,7 +187,7 @@ export function ReviewSession({ cards, topicSlug }: { cards: ReviewCard[]; topic
             </Badge>
             {current.topicSlug && current.topicTitle && (
               <Link
-                href={`/topics/${current.topicSlug}`}
+                href={`/${track}/topics/${current.topicSlug}`}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
                 {current.topicTitle}
@@ -238,7 +246,7 @@ export function ReviewSession({ cards, topicSlug }: { cards: ReviewCard[]; topic
       </Card>
 
       <div className="flex justify-between items-center text-xs text-muted-foreground">
-        <Link href="/topics" className="hover:text-foreground inline-flex items-center gap-1">
+        <Link href={`/${track}/topics`} className="hover:text-foreground inline-flex items-center gap-1">
           <ArrowLeft className="h-3 w-3" /> Exit session
         </Link>
         <div className="flex gap-3">

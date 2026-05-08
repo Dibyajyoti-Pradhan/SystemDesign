@@ -5,7 +5,8 @@ import { db } from "@/db/client";
 import { questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { claudeRun } from "@/lib/claude-cli";
-import { REPO_ROOT, QUESTIONS_CONTENT } from "@/lib/paths";
+import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "@/lib/paths";
+import { extractSourceText } from "@/lib/sourceExtract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,13 +52,6 @@ Keep it tight, ~150 words. No prose padding. Use real numbers when present in th
 
 Output ONLY the MDX. No commentary before or after.`;
 
-async function extractPdfText(absPath: string): Promise<string> {
-  const buf = await fs.readFile(absPath);
-  const pdfParse = (await import("pdf-parse")).default;
-  const data = await pdfParse(buf);
-  return data.text;
-}
-
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
 
@@ -70,12 +64,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: str
     return NextResponse.json({ error: "No source PDF" }, { status: 400 });
   }
 
-  let pdfText = "";
-  try {
-    pdfText = await extractPdfText(path.join(REPO_ROOT, q.pdfPath));
-  } catch (err) {
-    console.error("[questions/generate-brief] PDF extraction failed", err);
-  }
+  const pdfText = await extractSourceText(path.join(REPO_ROOT, q.pdfPath));
 
   let mdx = "";
   try {
@@ -110,11 +99,12 @@ Produce the MDX brief now. Remember: question only, never the solution.`,
     return NextResponse.json({ error: "Empty output" }, { status: 502 });
   }
 
-  await fs.mkdir(QUESTIONS_CONTENT, { recursive: true });
-  const outPath = path.join(QUESTIONS_CONTENT, `${q.slug}.mdx`);
+  const outDir = TRACK_PATHS[q.track].questionsContent;
+  await fs.mkdir(outDir, { recursive: true });
+  const outPath = path.join(outDir, `${q.slug}.mdx`);
   await fs.writeFile(outPath, cleaned, "utf8");
 
-  const relPath = path.relative(path.join(REPO_ROOT, "content"), outPath);
+  const relPath = path.relative(CONTENT_ROOT, outPath);
   await db.update(questions).set({ mdxPath: relPath }).where(eq(questions.id, q.id));
 
   return NextResponse.json({ ok: true, mdxPath: relPath });

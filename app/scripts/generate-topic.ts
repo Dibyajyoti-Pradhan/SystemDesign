@@ -4,15 +4,10 @@ import { db } from "../src/db/client";
 import { topics } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { claudeRun } from "../src/lib/claude-cli";
-import { REPO_ROOT, TOPICS_CONTENT } from "../src/lib/paths";
+import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "../src/lib/paths";
 import { slugify } from "../src/lib/utils";
 
-async function extractPdfText(absPath: string): Promise<string> {
-  const buf = await fs.readFile(absPath);
-  const pdfParse = (await import("pdf-parse")).default;
-  const data = await pdfParse(buf);
-  return data.text;
-}
+import { extractSourceText } from "../src/lib/sourceExtract";
 
 const SYSTEM_PROMPT = `You are an expert system-design educator writing study material for a senior engineer preparing for FAANG-level interviews.
 
@@ -61,12 +56,9 @@ async function generateForSlug(slug: string) {
     process.exit(1);
   }
 
-  const pdfAbs = path.join(REPO_ROOT, topic.pdfPath);
-  console.log(`[${slug}] extracting text from ${path.basename(pdfAbs)}...`);
-  const pdfText = await extractPdfText(pdfAbs).catch((e) => {
-    console.error(`[${slug}] PDF extraction failed:`, e.message);
-    return "";
-  });
+  const sourceAbs = path.join(REPO_ROOT, topic.pdfPath);
+  console.log(`[${slug}] extracting text from ${path.basename(sourceAbs)}...`);
+  const pdfText = await extractSourceText(sourceAbs);
 
   console.log(`[${slug}] calling Claude Code...`);
   const userPrompt = `Topic: ${topic.title}
@@ -91,12 +83,12 @@ Generate the MDX now.`;
     .trim();
 
   const categorySlug = slugify(topic.category);
-  const outDir = path.join(TOPICS_CONTENT, categorySlug);
+  const outDir = path.join(TRACK_PATHS[topic.track].topicsContent, categorySlug);
   await fs.mkdir(outDir, { recursive: true });
   const outPath = path.join(outDir, `${topic.slug}.mdx`);
   await fs.writeFile(outPath, cleaned, "utf8");
 
-  const relPath = path.relative(path.join(REPO_ROOT, "content"), outPath);
+  const relPath = path.relative(CONTENT_ROOT, outPath);
   await db.update(topics).set({ mdxPath: relPath }).where(eq(topics.id, topic.id));
 
   console.log(`[${slug}] ✓ wrote ${outPath}`);

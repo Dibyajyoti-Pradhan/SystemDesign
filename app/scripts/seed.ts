@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "../src/db/client";
-import { topics, questions, type NewTopic } from "../src/db/schema";
+import { topics, questions, type NewTopic, TRACKS, type Track } from "../src/db/schema";
 import { slugify } from "../src/lib/utils";
-import { REPO_ROOT, STUDY_GUIDE_PDFS, DESIGN_QUESTIONS_PDFS } from "../src/lib/paths";
+import { REPO_ROOT, TRACK_PATHS } from "../src/lib/paths";
 
 function readDir(p: string): string[] {
   if (!fs.existsSync(p)) return [];
@@ -16,33 +16,36 @@ function parseCategoryFolder(name: string): { order: number; category: string } 
   return { order: parseInt(m[1], 10), category: m[2].trim() };
 }
 
-function parseTopicFile(name: string): { order: number; title: string } | null {
-  const m = name.match(/^(\d+)\s*-\s*(.+?)\.pdf$/i);
+function parseTopicFile(name: string): { order: number; title: string; ext: string } | null {
+  const m = name.match(/^(\d+)\s*-\s*(.+?)\.(pdf|docx|md)$/i);
   if (!m) return null;
-  return { order: parseInt(m[1], 10), title: m[2].trim() };
+  return { order: parseInt(m[1], 10), title: m[2].trim(), ext: m[3].toLowerCase() };
 }
 
-function parseQuestionFile(name: string): { number: number; title: string } | null {
-  const m = name.match(/^(\d+)\s*-\s*(.+?)\.pdf$/i);
+function parseQuestionFile(name: string): { number: number; title: string; ext: string } | null {
+  const m = name.match(/^(\d+)\s*-\s*(.+?)\.(pdf|docx|md)$/i);
   if (!m) return null;
-  return { number: parseInt(m[1], 10), title: m[2].trim() };
+  return { number: parseInt(m[1], 10), title: m[2].trim(), ext: m[3].toLowerCase() };
 }
 
-async function seedTopics() {
-  const categories = readDir(STUDY_GUIDE_PDFS);
+async function seedTopicsForTrack(track: Track) {
+  const root = TRACK_PATHS[track].studyGuideSources;
+  const categories = readDir(root);
   const rows: NewTopic[] = [];
+
   for (const catName of categories) {
-    const catDir = path.join(STUDY_GUIDE_PDFS, catName);
+    const catDir = path.join(root, catName);
     if (!fs.statSync(catDir).isDirectory()) continue;
     const cat = parseCategoryFolder(catName);
     if (!cat) continue;
 
-    const files = readDir(catDir).filter((f) => f.toLowerCase().endsWith(".pdf"));
+    const files = readDir(catDir).filter((f) => /\.(pdf|docx|md)$/i.test(f));
     for (const file of files) {
       const t = parseTopicFile(file);
       if (!t) continue;
       const slug = slugify(`${cat.category}-${t.title}`);
       rows.push({
+        track,
         slug,
         category: cat.category,
         categoryOrder: cat.order,
@@ -53,50 +56,54 @@ async function seedTopics() {
       });
     }
   }
-  if (rows.length === 0) {
-    console.log("No topic PDFs found.");
-    return;
-  }
+
+  let inserted = 0;
   for (const r of rows) {
     try {
-      await db.insert(topics).values(r).onConflictDoNothing();
+      const result = await db.insert(topics).values(r).onConflictDoNothing().returning({ id: topics.id });
+      if (result.length > 0) inserted++;
     } catch (e) {
-      console.error("topic insert failed", r.slug, e);
+      console.error(`[${track}] topic insert failed`, r.slug, e);
     }
   }
-  console.log(`Seeded ${rows.length} topics across ${new Set(rows.map((r) => r.category)).size} categories.`);
+  console.log(`[${track}] seeded ${inserted}/${rows.length} topics across ${new Set(rows.map((r) => r.category)).size} categories.`);
 }
 
-async function seedQuestions() {
-  const files = readDir(DESIGN_QUESTIONS_PDFS).filter((f) => f.toLowerCase().endsWith(".pdf"));
-  let n = 0;
+async function seedQuestionsForTrack(track: Track) {
+  const root = TRACK_PATHS[track].questionsSources;
+  const files = readDir(root).filter((f) => /\.(pdf|docx|md)$/i.test(f));
+  let inserted = 0;
   for (const file of files) {
     const q = parseQuestionFile(file);
     if (!q) continue;
     const slug = slugify(`${String(q.number).padStart(2, "0")}-${q.title}`);
     try {
-      await db
+      const result = await db
         .insert(questions)
         .values({
+          track,
           slug,
           number: q.number,
           title: q.title,
           difficulty: "medium",
           tags: "[]",
-          pdfPath: path.relative(REPO_ROOT, path.join(DESIGN_QUESTIONS_PDFS, file)),
+          pdfPath: path.relative(REPO_ROOT, path.join(root, file)),
         })
-        .onConflictDoNothing();
-      n++;
+        .onConflictDoNothing()
+        .returning({ id: questions.id });
+      if (result.length > 0) inserted++;
     } catch (e) {
-      console.error("question insert failed", slug, e);
+      console.error(`[${track}] question insert failed`, slug, e);
     }
   }
-  console.log(`Seeded ${n} design questions.`);
+  console.log(`[${track}] seeded ${inserted}/${files.length} questions.`);
 }
 
 async function main() {
-  await seedTopics();
-  await seedQuestions();
+  for (const track of TRACKS) {
+    await seedTopicsForTrack(track);
+    await seedQuestionsForTrack(track);
+  }
 }
 
 main().catch((e) => {

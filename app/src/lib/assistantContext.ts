@@ -17,10 +17,10 @@ export async function resolvePageContext(pathname: string): Promise<string | nul
   if (!pathname) return null;
   const clean = pathname.split("?")[0].split("#")[0];
 
-  // /topics/<slug>
-  const topicMatch = clean.match(/^\/topics\/([^/]+)/);
+  // /[track]/topics/<slug> OR legacy /topics/<slug>
+  const topicMatch = clean.match(/^(?:\/(?:system-design|coding))?\/topics\/([^/]+)/);
   if (topicMatch) {
-    const [t] = await db.select().from(topics).where(eq(topics.slug, topicMatch[1])).limit(1);
+    const [t] = await db.select().from(topics).where(eq(topics.slug, topicMatch[1]!)).limit(1);
     if (!t) return null;
     let body = "";
     if (t.mdxPath) {
@@ -31,8 +31,8 @@ export async function resolvePageContext(pathname: string): Promise<string | nul
 ${t.summary ? `Summary: ${t.summary}\n` : ""}${body ? `\nTopic content excerpt:\n${body}` : ""}`;
   }
 
-  // /questions or /questions/<slug>
-  const qMatch = clean.match(/^\/questions(?:\/([^/]+))?/);
+  // /[track]/questions or /[track]/questions/<slug> OR legacy
+  const qMatch = clean.match(/^(?:\/(?:system-design|coding))?\/questions(?:\/([^/]+))?/);
   if (qMatch) {
     if (qMatch[1]) {
       const [q] = await db.select().from(questions).where(eq(questions.slug, qMatch[1])).limit(1);
@@ -56,15 +56,17 @@ ${t.summary ? `Summary: ${t.summary}\n` : ""}${body ? `\nTopic content excerpt:\
     return `The user is observing a ${s.mode === "ai_vs_ai" ? "AI-vs-AI" : "self"} interview session for **${q?.title ?? "?"}**. Status: ${s.endedAt ? "ended" : "in progress"}.`;
   }
 
-  // /cheatsheets/<slug>
-  const cheatMatch = clean.match(/^\/cheatsheets\/([^/]+)/);
+  // /[track]/cheatsheets/<slug>
+  const cheatMatch = clean.match(/^\/(system-design|coding)\/cheatsheets\/([^/]+)/);
   if (cheatMatch) {
-    const dir = path.join(CONTENT_ROOT, "cheatsheets");
+    const trackSlug = cheatMatch[1];
+    const sheetSlug = cheatMatch[2]!;
+    const dir = path.join(CONTENT_ROOT, trackSlug, "cheatsheets");
     for (const ext of [".md", ".mdx"]) {
       try {
-        const raw = await fs.readFile(path.join(dir, `${cheatMatch[1]}${ext}`), "utf8");
+        const raw = await fs.readFile(path.join(dir, `${sheetSlug}${ext}`), "utf8");
         const { data, content } = matter(raw);
-        return `The user is reading the cheatsheet **${(data.title as string) ?? cheatMatch[1]}**.
+        return `The user is reading the cheatsheet **${(data.title as string) ?? sheetSlug}** (${trackSlug}).
 ${data.description ? `Description: ${data.description}\n` : ""}\nExcerpt:\n${content.slice(0, 3000)}`;
       } catch {}
     }

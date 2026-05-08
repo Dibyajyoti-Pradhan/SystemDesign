@@ -1,8 +1,13 @@
 import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import { TRACKS } from "@/lib/tracks";
+
+export type { Track } from "@/lib/tracks";
+export { TRACKS } from "@/lib/tracks";
 
 export const topics = sqliteTable("topics", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  track: text("track", { enum: TRACKS }).notNull().default("system-design"),
   slug: text("slug").notNull().unique(),
   category: text("category").notNull(),
   categoryOrder: integer("category_order").notNull().default(0),
@@ -32,6 +37,7 @@ export const topicLinks = sqliteTable(
 
 export const questions = sqliteTable("questions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  track: text("track", { enum: TRACKS }).notNull().default("system-design"),
   slug: text("slug").notNull().unique(),
   number: integer("number"),
   title: text("title").notNull(),

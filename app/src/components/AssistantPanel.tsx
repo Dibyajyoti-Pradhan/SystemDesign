@@ -47,18 +47,25 @@ function MarkdownWithMermaid({ text }: { text: string }) {
 }
 
 function pageLabel(pathname: string): string {
-  if (pathname === "/") return "Dashboard";
-  if (pathname.startsWith("/topics/")) return "Topic page";
-  if (pathname === "/topics") return "Topic browser";
-  if (pathname.startsWith("/cheatsheets/")) return "Cheatsheet";
-  if (pathname === "/cheatsheets") return "Cheatsheets";
-  if (pathname.startsWith("/interview/sessions/")) return "Practice session";
-  if (pathname.startsWith("/interview")) return "Practice";
-  if (pathname.startsWith("/review")) return "Review";
+  if (pathname === "/") return "Home";
+  // /[track]/... pages
+  const trackMatch = pathname.match(/^\/(system-design|coding)(\/.*)?$/);
+  if (trackMatch) {
+    const trackLabel = trackMatch[1] === "coding" ? "Coding" : "System Design";
+    const sub = trackMatch[2] ?? "";
+    if (sub.startsWith("/topics/")) return `${trackLabel} · Topic`;
+    if (sub === "/topics") return `${trackLabel} · Topics`;
+    if (sub.startsWith("/questions/")) return `${trackLabel} · Question`;
+    if (sub === "/questions") return `${trackLabel} · Questions`;
+    if (sub.startsWith("/cheatsheets/")) return `${trackLabel} · Cheatsheet`;
+    if (sub === "/cheatsheets") return `${trackLabel} · Cheatsheets`;
+    if (sub.startsWith("/review")) return `${trackLabel} · Review`;
+    return trackLabel;
+  }
+  if (pathname.startsWith("/interview/sessions/")) return "Session";
   if (pathname.startsWith("/admin/cards")) return "Card review queue";
   if (pathname.startsWith("/concept-map")) return "Concept map";
   if (pathname.startsWith("/notes")) return "Notes";
-  if (pathname.startsWith("/questions")) return "Design questions";
   if (pathname.startsWith("/search")) return "Search";
   return pathname;
 }

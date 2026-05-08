@@ -5,8 +5,9 @@ import { db } from "@/db/client";
 import { topics } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { claudeRun } from "@/lib/claude-cli";
-import { REPO_ROOT, TOPICS_CONTENT } from "@/lib/paths";
+import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "@/lib/paths";
 import { slugify } from "@/lib/utils";
+import { extractSourceText } from "@/lib/sourceExtract";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,13 +49,6 @@ Rules:
 - Write for someone who already knows what a server is.
 - Output ONLY the MDX. No commentary before or after.`;
 
-async function extractPdfText(absPath: string): Promise<string> {
-  const buf = await fs.readFile(absPath);
-  const pdfParse = (await import("pdf-parse")).default;
-  const data = await pdfParse(buf);
-  return data.text;
-}
-
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
   const { slug } = await ctx.params;
 
@@ -72,13 +66,8 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: str
     return NextResponse.json({ error: "Topic has no source PDF" }, { status: 400 });
   }
 
-  const pdfAbs = path.join(REPO_ROOT, topic.pdfPath);
-  let pdfText = "";
-  try {
-    pdfText = await extractPdfText(pdfAbs);
-  } catch (err) {
-    console.error("[topics/generate] PDF extraction failed", err);
-  }
+  const sourceAbs = path.join(REPO_ROOT, topic.pdfPath);
+  const pdfText = await extractSourceText(sourceAbs);
 
   let mdx = "";
   try {
@@ -114,12 +103,12 @@ Generate the MDX now.`,
   }
 
   const categorySlug = slugify(topic.category);
-  const outDir = path.join(TOPICS_CONTENT, categorySlug);
+  const outDir = path.join(TRACK_PATHS[topic.track].topicsContent, categorySlug);
   await fs.mkdir(outDir, { recursive: true });
   const outPath = path.join(outDir, `${topic.slug}.mdx`);
   await fs.writeFile(outPath, cleaned, "utf8");
 
-  const relPath = path.relative(path.join(REPO_ROOT, "content"), outPath);
+  const relPath = path.relative(CONTENT_ROOT, outPath);
   await db.update(topics).set({ mdxPath: relPath }).where(eq(topics.id, topic.id));
 
   return NextResponse.json({ ok: true, mdxPath: relPath });

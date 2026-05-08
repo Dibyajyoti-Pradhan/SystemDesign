@@ -5,7 +5,7 @@ import path from "node:path";
 import matter from "gray-matter";
 import { db } from "@/db/client";
 import { questions, interviewSessions } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import {
   Bot,
   FileText,
 } from "lucide-react";
-import { CONTENT_ROOT } from "@/lib/paths";
+import { CONTENT_ROOT, parseTrack } from "@/lib/paths";
 import { MdxRenderer } from "@/components/MdxRenderer";
 import { relativeTime } from "@/lib/utils";
 import { GenerateBriefButton } from "@/components/question/GenerateBriefButton";
@@ -52,10 +52,16 @@ async function readBrief(mdxPath: string | null): Promise<string | null> {
 export default async function QuestionDetailPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ track: string; slug: string }>;
 }) {
-  const { slug } = await params;
-  const [q] = await db.select().from(questions).where(eq(questions.slug, slug)).limit(1);
+  const { track: trackParam, slug } = await params;
+  const track = parseTrack(trackParam);
+  if (!track) notFound();
+  const [q] = await db
+    .select()
+    .from(questions)
+    .where(and(eq(questions.slug, slug), eq(questions.track, track)))
+    .limit(1);
   if (!q) notFound();
 
   const briefBody = await readBrief(q.mdxPath);
@@ -69,7 +75,7 @@ export default async function QuestionDetailPage({
   return (
     <div className="max-w-3xl mx-auto p-8 space-y-6">
       <Link
-        href="/questions"
+        href={`/${track}/questions`}
         className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
       >
         <ArrowLeft className="h-4 w-4" /> All questions

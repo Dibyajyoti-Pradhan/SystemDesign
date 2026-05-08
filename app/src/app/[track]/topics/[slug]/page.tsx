@@ -12,10 +12,17 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, ExternalLink, FileText, Sparkles } from "lucide-react";
 import { GenerateTopicButton } from "@/components/topic/GenerateTopicButton";
+import { parseTrack } from "@/lib/paths";
 
-export default async function TopicPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const [topic] = await db.select().from(topics).where(eq(topics.slug, slug)).limit(1);
+export default async function TopicPage({ params }: { params: Promise<{ track: string; slug: string }> }) {
+  const { track: trackParam, slug } = await params;
+  const track = parseTrack(trackParam);
+  if (!track) notFound();
+  const [topic] = await db
+    .select()
+    .from(topics)
+    .where(and(eq(topics.slug, slug), eq(topics.track, track)))
+    .limit(1);
   if (!topic) notFound();
 
   const parsed = topic.mdxPath ? await readTopicMdx(topic.mdxPath) : null;
@@ -48,7 +55,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
     <div className="max-w-4xl mx-auto p-8 space-y-6">
       <div className="flex items-center justify-between">
         <Link
-          href="/topics"
+          href={`/${track}/topics`}
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
           <ArrowLeft className="h-4 w-4" /> All topics
@@ -129,7 +136,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {relatedTopics.map((r) => (
-                <Link key={r.id} href={`/topics/${r.slug}`}>
+                <Link key={r.id} href={`/${track}/topics/${r.slug}`}>
                   <Badge variant="outline" className="hover:bg-accent cursor-pointer">{r.title}</Badge>
                 </Link>
               ))}
@@ -140,7 +147,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
 
       <div className="flex gap-2 pt-4 border-t">
         <Button asChild variant="outline" size="sm">
-          <Link href={`/review?topic=${topic.slug}`}>
+          <Link href={`/${track}/review?topic=${topic.slug}`}>
             <Sparkles className="h-4 w-4" /> Review cards
           </Link>
         </Button>

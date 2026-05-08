@@ -96,7 +96,7 @@ export default async function InterviewSessionPage({
     <div className="max-w-6xl mx-auto p-8 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link
-          href="/questions"
+          href={`/${question.track}/questions`}
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
           <ArrowLeft className="h-4 w-4" /> Practice
@@ -129,7 +129,7 @@ export default async function InterviewSessionPage({
               </Button>
               <DeleteSessionButton
                 sessionId={session.id}
-                redirectTo="/questions"
+                redirectTo={`/${question.track}/questions`}
                 size="sm"
               />
             </>
@@ -204,7 +204,7 @@ export default async function InterviewSessionPage({
 
           <div className="pt-2">
             <Button asChild variant="outline" size="sm">
-              <Link href="/questions">Try another question</Link>
+              <Link href={`/${question.track}/questions`}>Try another question</Link>
             </Button>
           </div>
         </>
