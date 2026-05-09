@@ -177,9 +177,6 @@ export default async function TopicPage({ params }: { params: Promise<{ track: s
             <Sparkles className="h-4 w-4" /> Review cards
           </Link>
         </Button>
-        <Button asChild variant="ghost" size="sm">
-          <Link href={`/notes?topic=${topic.slug}`}>Notes</Link>
-        </Button>
       </div>
     </div>
   );

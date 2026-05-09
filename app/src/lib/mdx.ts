@@ -34,20 +34,25 @@ export interface ParsedMdx {
  * This keeps everything in one file (one source of truth) while letting the UI
  * render three depth views.
  */
+function stripLeadingH1(text: string): string {
+  return text.replace(/^#[^\S\n][^\n]*\n?/, "").trimStart();
+}
+
 export function splitDepthSections(body: string): ParsedMdx["sections"] {
   const tldrIdx = body.indexOf("<!-- tldr -->");
   const stdIdx = body.indexOf("<!-- standard -->");
   const deepIdx = body.indexOf("<!-- deep -->");
 
   if (tldrIdx === -1 && stdIdx === -1 && deepIdx === -1) {
-    return { tldr: body.trim(), standard: body.trim(), deep: body.trim() };
+    const section = stripLeadingH1(body.trim());
+    return { tldr: section, standard: section, deep: section };
   }
 
   const sliceBetween = (start: number, ...ends: number[]) => {
     if (start === -1) return "";
     const validEnds = ends.filter((e) => e > start);
     const end = validEnds.length ? Math.min(...validEnds) : body.length;
-    return body.slice(start, end).replace(/^<!--[^>]*-->/, "").trim();
+    return stripLeadingH1(body.slice(start, end).replace(/^<!--[^>]*-->/, "").trim());
   };
 
   return {

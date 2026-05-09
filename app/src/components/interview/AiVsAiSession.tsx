@@ -185,7 +185,10 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
       setStreamingRole(role);
       setStreamingText("");
 
-      const reader = res.body!.getReader();
+      if (!res.body) {
+        throw new Error("Empty response from server");
+      }
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       while (true) {
         const { value, done } = await reader.read();
@@ -193,6 +196,15 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
         const chunk = decoder.decode(value, { stream: true });
         accumulated += chunk;
         setStreamingText((prev) => prev + chunk);
+      }
+
+      if (!accumulated) {
+        throw new Error("Empty response from server");
+      }
+      // If the server embedded a stream-level error sentinel, surface it as an error state.
+      if (accumulated.includes("[error:")) {
+        const match = accumulated.match(/\[error: ([^\]]+)\]/);
+        throw new Error(match ? match[1] : "upstream error (see stream body)");
       }
 
       // Commit the streamed message into the transcript.
@@ -228,6 +240,7 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         setError(e?.message ?? String(e));
+        setPaused(true);
       }
     } finally {
       setStreamingRole(null);
@@ -279,6 +292,10 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
     if (running) abortRef.current?.abort();
     setPaused(true);
     setEnded(true);
+    // Mark all pending steers consumed so the "N steers pending" badge clears immediately.
+    setMessages((prev) =>
+      prev.map((m) => (m.role === "steer" && !m.consumed ? { ...m, consumed: true } : m)),
+    );
     setGrading(true);
     try {
       const res = await fetch("/api/interview/grade", {
@@ -290,12 +307,12 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
         const t = await res.text();
         throw new Error(t);
       }
-      // Reload so the parent page picks up the rubric and renders the post-session view.
-      router.refresh();
     } catch (e: any) {
       setError(`Grading failed: ${e?.message ?? String(e)}`);
     } finally {
       setGrading(false);
+      // Always refresh so the server-rendered badge picks up endedAt, even if grading failed.
+      router.refresh();
     }
   };
 
@@ -347,11 +364,22 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
       {error && (
         <Card className="border-destructive/40 bg-destructive/5">
           <CardContent className="py-3 flex items-start gap-2 text-sm">
-            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5" />
-            <div>
-              <div className="font-medium text-destructive">Error</div>
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <div className="font-medium text-destructive">Step failed</div>
               <div className="text-muted-foreground">{error}</div>
             </div>
+            {!ended && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => { setError(null); step(); }}
+                disabled={running}
+              >
+                Retry
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

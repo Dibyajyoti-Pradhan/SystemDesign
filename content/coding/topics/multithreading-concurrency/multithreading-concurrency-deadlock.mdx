@@ -2,109 +2,123 @@
 title: Deadlock
 slug: multithreading-concurrency-deadlock
 category: Multithreading & Concurrency
-tldr: Deadlock occurs when two or more threads permanently block each other by holding locks the others need.
-related: [multithreading-concurrency-livelock, multithreading-concurrency-reentrantlock]
+tldr: Deadlock occurs when two or more threads permanently block each other, each holding a resource the other needs.
+related: [multithreading-concurrency-livelock-starvation, multithreading-concurrency-reentrantlock]
 ---
 
 <!-- tldr -->
 # Deadlock
 
-A deadlock is a state where N ≥ 2 threads are each waiting for a resource held by another thread in the cycle — none can ever proceed. All four Coffman conditions must hold simultaneously for a deadlock to exist; eliminating any one of them prevents it. In Java, deadlocks are silent: threads neither throw exceptions nor time out unless you explicitly code for it.
+Deadlock is a state where a set of threads are permanently suspended because each is waiting for a resource held by another in the set. It is not a race condition — no progress is made at all. The four Coffman conditions must all hold simultaneously for deadlock to occur: mutual exclusion, hold-and-wait, no preemption, and circular wait. Breaking any one of them eliminates deadlock.
 
 ```mermaid
 flowchart LR
-    T1("Thread 1") -- holds --> LA["Lock A"]
-    T1 -- wants --> LB["Lock B"]
-    T2("Thread 2") -- holds --> LB
-    T2 -- wants --> LA
-    style T1 fill:#e74c3c,color:#fff
-    style T2 fill:#e74c3c,color:#fff
-    style LA fill:#3498db,color:#fff
-    style LB fill:#3498db,color:#fff
+    TA["Thread A\n(holds Lock 1)"] -->|"waits for"| L2["Lock 2"]
+    TB["Thread B\n(holds Lock 2)"] -->|"waits for"| L1["Lock 1"]
+    L1["Lock 1"] -->|"held by"| TA
+    L2["Lock 2"] -->|"held by"| TB
 ```
 
 <!-- standard -->
 
 ## What It Is
 
-A deadlock is a **circular-wait** condition among threads competing for exclusive resources. It is distinct from:
+A deadlock freezes a subset of threads indefinitely. Unlike livelock (threads keep spinning) or starvation (a thread is perpetually skipped), deadlocked threads consume no CPU — they are simply parked, waiting forever.
 
-| Condition | Threads progress? | Eventually resolves? |
-|-----------|-------------------|----------------------|
-| **Deadlock** | No | No — permanent |
-| **Livelock** | Yes (spinning) | No — perpetual retry |
-| **Starvation** | Some do | Theoretically yes |
-| **Lock contention** | Yes (blocked, not stuck) | Yes — once lock free |
+### The Four Coffman Conditions
 
-## The Four Coffman Conditions
+| Condition | Meaning | Break it by… |
+|---|---|---|
+| **Mutual exclusion** | Resource can't be shared | Use concurrent data structures (e.g., `ConcurrentHashMap`) |
+| **Hold-and-wait** | Thread holds ≥1 resource while requesting more | Acquire all locks atomically upfront |
+| **No preemption** | Locks can't be forcibly taken | Use `tryLock(timeout)` to release and retry |
+| **Circular wait** | A cycle exists in the wait-for graph | Enforce a global lock-ordering protocol |
 
-Breaking **any one** is sufficient to prevent deadlock:
+### Primary Techniques
 
-1. **Mutual Exclusion** — resource can only be held by one thread at a time.
-2. **Hold and Wait** — a thread holds ≥1 resource while requesting more.
-3. **No Preemption** — locks cannot be forcibly taken; only voluntarily released.
-4. **Circular Wait** — a cycle T1→T2→…→Tn→T1 exists in the wait-for graph.
+- **Lock ordering** — always acquire locks in a deterministic global order (e.g., by object identity hash or assigned ID). Zero runtime overhead; most commonly applied technique.
+- **`tryLock` with timeout** — `ReentrantLock.tryLock(100, MILLISECONDS)` lets a thread back off and retry instead of blocking forever.
+- **Lock-free / non-blocking structures** — `AtomicReference`, `LongAdder`, `ConcurrentLinkedQueue` eliminate mutually exclusive locking entirely.
+- **Single-lock redesign** — restructure ownership so one entity owns the resource hierarchy (common fix in producer–consumer pipelines).
+- **Deadlock detection** — build a wait-for graph at runtime; detect cycles and recover (rollback one victim thread). Used in databases, rarely in application code.
 
-## Primary Prevention Techniques
+### Key Tradeoffs
 
-- **Lock ordering** — assign a global total order to all locks; always acquire in ascending order. Eliminates circular wait.
-- **`tryLock` with timeout** — `ReentrantLock.tryLock(500, MILLISECONDS)`; if acquisition fails, release all held locks, back off, retry. Eliminates hold-and-wait.
-- **Lock-free / compare-and-swap** — `AtomicReference`, `ConcurrentHashMap` internals use CAS loops; no mutex means no deadlock.
-- **Single global lock / coarse-grained locking** — trivially deadlock-free but destroys concurrency.
-- **Deadlock detection + recovery** — used by RDBMS (InnoDB, PostgreSQL); maintain a wait-for graph, detect cycles at runtime, kill the "youngest" transaction.
+| Approach | Pros | Cons |
+|---|---|---|
+| Lock ordering | Zero overhead, simple | Must be enforced globally; breaks with dynamic lock sets |
+| `tryLock` + retry | Works with dynamic lock sets | Livelock risk if all threads back off simultaneously |
+| Lock-free structures | Highest throughput | Harder to write correctly; limited to specific patterns |
+| Detection + rollback | Handles any lock topology | Adds graph maintenance overhead; recovery is complex |
 
 ```mermaid
 flowchart TD
-    subgraph Prevention["Deadlock Prevention Strategies"]
-        LO["Lock Ordering\n(fix acquire sequence)"] --> NoCircular["Breaks\nCircular Wait"]
-        TL["tryLock + timeout\n(release all on failure)"] --> NoHW["Breaks\nHold & Wait"]
-        CAS["Lock-Free CAS\n(AtomicXxx, ConcurrentHashMap)"] --> NoME["Breaks\nMutual Exclusion"]
-        DD["Detect + Kill\n(wait-for graph cycle)"] --> Recovery["Recovery\n(rollback victim)"]
-    end
-    style LO fill:#2ecc71,color:#000
-    style TL fill:#2ecc71,color:#000
-    style CAS fill:#2ecc71,color:#000
-    style DD fill:#f39c12,color:#000
+    Start(["Thread needs Lock X and Lock Y"]) --> Order{"Global order\nenforced?"}
+    Order -->|Yes| AcquireX["Acquire Lock X first"]
+    AcquireX --> AcquireY["Acquire Lock Y"]
+    AcquireY --> Done(["Work → release Y → release X"])
+    Order -->|No| Risk["Circular wait possible\n→ Deadlock"]
 ```
-
-## Key Tradeoffs
-
-- Lock ordering is zero-runtime-cost but requires **global discipline** — one violation anywhere re-introduces the bug.
-- `tryLock` with backoff can degrade to livelock under high contention if backoff is uniform (use jittered exponential).
-- Lock-free structures have higher throughput at scale but are far harder to reason about and compose.
 
 <!-- deep -->
 
-## Deep Dive: Deadlock
+## Deep Dive
 
-### Formal Model — Wait-For Graph (WFG)
+### The Coffman Conditions — Formally
 
-Represent each thread as a node. Draw a directed edge **T_i → T_j** if T_i is waiting for a lock currently held by T_j. A deadlock exists **iff the WFG contains a cycle**.
+Let **R** be a set of resources, **T** a set of threads, and **W(t)** the set of resources thread *t* waits for. A deadlock exists iff the **wait-for graph** G = (T, E) where edge t₁ → t₂ means "t₁ waits for a lock held by t₂" contains a **cycle**.
 
-For resource instances (e.g., a pool of N identical connections), use a **Resource-Allocation Graph (RAG)**:
+Detection complexity: **O(V + E)** with DFS. For *n* threads each holding one lock, V = n, E ≤ n — detection is cheap. The expensive part is maintaining the graph incrementally under high concurrency.
 
-- **Request edge**: T → R (thread wants the resource)
-- **Assignment edge**: R → T (resource assigned to thread)
+---
 
-A cycle in a RAG with single-instance resources is a necessary **and** sufficient condition for deadlock.
+### Java-Specific Tools and APIs
 
-### Java: `synchronized` vs `ReentrantLock`
-
-| Feature | `synchronized` | `ReentrantLock` |
-|---|---|---|
-| Trylock with timeout | ❌ | ✅ `tryLock(long, TimeUnit)` |
-| Interruptible wait | ❌ | ✅ `lockInterruptibly()` |
-| Fairness policy | ❌ | ✅ `new ReentrantLock(true)` |
-| Condition variables | 1 per object | Multiple per lock |
-| Deadlock visibility | Thread dump | Thread dump |
-
-**Canonical lock-ordering pattern in Java:**
+#### Detection at Runtime
 
 ```java
-// Always sort by System.identityHashCode to impose a total order
+ThreadMXBean bean = ManagementFactory.getThreadMXBean();
+long[] deadlocked = bean.findDeadlockedThreads(); // returns null if none
+if (deadlocked != null) {
+    ThreadInfo[] info = bean.getThreadInfo(deadlocked, true, true);
+    // log stack traces, alert, trigger graceful shutdown
+}
+```
+
+`findDeadlockedThreads()` covers both `synchronized` monitors **and** `java.util.concurrent` locks. `findMonitorDeadlockedThreads()` covers only `synchronized`.
+
+#### Prevention with `tryLock`
+
+```java
+ReentrantLock lockA = new ReentrantLock();
+ReentrantLock lockB = new ReentrantLock();
+
+boolean acquired = false;
+while (!acquired) {
+    boolean gotA = lockA.tryLock(50, MILLISECONDS);
+    if (gotA) {
+        boolean gotB = lockB.tryLock(50, MILLISECONDS);
+        if (gotB) {
+            acquired = true;
+            try { /* critical section */ }
+            finally { lockB.unlock(); lockA.unlock(); }
+        } else {
+            lockA.unlock(); // back off
+        }
+    }
+    if (!acquired) Thread.sleep(ThreadLocalRandom.current().nextLong(10, 50)); // jitter
+}
+```
+
+**Caution:** without random jitter, all contending threads back off and retry in lockstep → **livelock**. Add `ThreadLocalRandom` jitter.
+
+#### Lock Ordering by System Identity Hash
+
+```java
+// Prevents circular wait without any coordination overhead
 void transfer(Account from, Account to, int amount) {
-    Account first  = from.id() < to.id() ? from : to;
-    Account second = from.id() < to.id() ? to   : from;
+    Account first  = System.identityHashCode(from) < System.identityHashCode(to) ? from : to;
+    Account second = first == from ? to : from;
     synchronized (first) {
         synchronized (second) {
             from.debit(amount);
@@ -114,126 +128,108 @@ void transfer(Account from, Account to, int amount) {
 }
 ```
 
-**tryLock pattern (breaks hold-and-wait):**
+If `identityHashCode` ties (extremely rare), introduce a **tie-breaking lock** (a single global mutex) to guard the ordering decision.
 
-```java
-boolean transferred = false;
-while (!transferred) {
-    if (lockA.tryLock(50, MILLISECONDS)) {
-        try {
-            if (lockB.tryLock(50, MILLISECONDS)) {
-                try {
-                    // critical section
-                    transferred = true;
-                } finally { lockB.unlock(); }
-            }
-        } finally { lockA.unlock(); }
-    }
-    if (!transferred) Thread.sleep(ThreadLocalRandom.current().nextInt(10, 100)); // jitter
-}
-```
-
-### Detection: Thread Dumps & `jstack`
-
-```
-Found one Java-level deadlock:
-"Thread-1":
-  waiting to lock monitor 0x00007f... (object 0x..., a java.lang.Object),
-  which is held by "Thread-0"
-"Thread-0":
-  waiting to lock monitor 0x00007f... (object 0x..., a java.lang.Object),
-  which is held by "Thread-1"
-```
-
-- `jstack <pid>` — standard JDK tool, prints full WFG analysis.
-- `ThreadMXBean.findDeadlockedThreads()` — programmatic detection at runtime; returns `null` if no deadlock. Poll in a watchdog thread every 5–10 seconds.
-- JFR (Java Flight Recorder) + JMC captures lock contention events continuously with < 1% overhead.
+---
 
 ### Real-World Systems
 
-#### InnoDB (MySQL)
-- Maintains an in-memory wait-for graph per transaction.
-- Runs cycle detection after **every lock request**.
-- On cycle detected: kills the transaction with the **fewest undo log records** (cheapest rollback).
-- Exposed via `SHOW ENGINE INNODB STATUS` → `LATEST DETECTED DEADLOCK`.
-- Typical deadlock rate in high-throughput OLTP: 10–500/sec under heavy write contention; applications must retry on `1213 ER_LOCK_DEADLOCK`.
+#### MySQL InnoDB
+- Maintains a wait-for graph in memory and runs cycle detection after **every** lock grant.
+- On cycle detected, it rolls back the **transaction with the fewest undo log records** (cheapest victim).
+- Configurable via `innodb_deadlock_detect` (default ON). Disabling it shifts responsibility to `innodb_lock_wait_timeout` (default 50 s).
+- Production rate: well-tuned OLTP schemas see < 1 deadlock/min at 50K TPS. Poorly designed schemas can see hundreds/sec.
 
 #### PostgreSQL
-- Uses a **lightweight deadlock check** delayed 1 second after a lock wait begins (configurable via `deadlock_timeout`, default 1 s).
-- Kills the process that initiated the deadlock detection (not necessarily the "youngest").
+- Uses a **lightweight deadlock detector** that runs whenever a lock request blocks for > `deadlock_timeout` (default 1 s).
+- Detects cycles via DFS; aborts one transaction with `ERROR 40P01: deadlock detected`.
 
-#### Cassandra / DynamoDB
-- Single-partition operations are lock-free by design (CAS via Paxos LWT in Cassandra, conditional writes in DynamoDB).
-- Multi-item transactions (Cassandra 4+ Accord, DynamoDB Transactions) use optimistic concurrency with version checks — deadlock-free by construction.
+#### Apache Kafka (broker internals)
+- Avoids deadlock by using **partitioned, single-threaded log segments** — each partition's log is owned by one thread; no cross-partition locks.
+- Controller-to-broker coordination uses ZooKeeper/KRaft leader election to serialize state changes rather than holding concurrent locks.
 
-#### Kafka Broker
-- Broker-level deadlock historically appeared in `ReplicaManager` ↔ `LogManager` lock inversion (KAFKA-3061). Fixed via lock ordering. Still a canary: subscribe to Apache Kafka JIRA for `deadlock` label — appears ~2/year.
+#### HikariCP (JDBC connection pool)
+- A common application-level deadlock: Thread A holds a DB connection and requests a second from an exhausted pool; Thread B is identical. Fix: `maximumPoolSize` ≥ max concurrent nested connection requests per request path. HikariCP logs this scenario explicitly.
 
-### Sequence: Deadlock-Free Transfer via Lock Ordering
+#### Java `ForkJoinPool`
+- Work-stealing design avoids deadlock by having blocked workers **compensate**: spin up extra threads up to `parallelism * 2` when all workers are blocked on `ManagedBlocker`.
+
+---
+
+### Sequence: Deadlock Formation and Detection
 
 ```mermaid
 sequenceDiagram
-    participant T1 as Thread 1
-    participant T2 as Thread 2
-    participant LA as Lock A (id=1)
-    participant LB as Lock B (id=2)
+    participant TA as Thread A
+    participant L1 as Lock 1
+    participant L2 as Lock 2
+    participant TB as Thread B
+    participant DT as Detector
 
-    Note over T1,T2: Both enforce order: acquire id=1 first, then id=2
-    T1->>LA: lock() ✓
-    T2->>LA: lock() — BLOCKS (T1 holds)
-    T1->>LB: lock() ✓
-    T1->>LB: unlock()
-    T1->>LA: unlock()
-    LA-->>T2: granted
-    T2->>LB: lock() ✓
-    T2->>LB: unlock()
-    T2->>LA: unlock()
+    TA->>L1: lock() ✓
+    TB->>L2: lock() ✓
+    TA-->>L2: lock() — BLOCKED
+    TB-->>L1: lock() — BLOCKED
+    Note over TA,TB: Both parked; CPU = 0
+
+    DT->>DT: Build wait-for graph
+    DT->>DT: DFS — cycle found: A→B→A
+    DT->>TB: Interrupt / rollback victim
+    TB->>L1: release()
+    L1-->>TA: granted ✓
+    TA->>L2: lock() ✓
 ```
 
-### Capacity & Latency Numbers
+---
 
-| Scenario | Number |
-|---|---|
-| InnoDB deadlock detection overhead | ~10 µs per lock request in WFG traversal |
-| `ThreadMXBean.findDeadlockedThreads()` poll | ~50 µs; safe at 1 Hz per watchdog |
-| `jstack` generation on 500-thread JVM | ~200–500 ms (stop-the-world) |
-| Typical `tryLock` timeout to avoid deadlock | 50–500 ms depending on SLO |
-| JDBC connection pool starvation → effective deadlock | < 5 s with pool size = max concurrent txn depth |
+### Failure Modes and Capacity Numbers
 
-### Failure Modes Beyond the Obvious
+| Scenario | Symptom | Typical MTTR |
+|---|---|---|
+| App-level deadlock (`synchronized`) | Threads stuck in BLOCKED; heap flat; CPU ~0% | Minutes — requires restart or `ThreadMXBean` alert |
+| DB deadlock storm | Error rate spikes; latency bimodal (fast + 50s timeouts) | Seconds if auto-detected; minutes if timeout-based |
+| Connection pool deadlock | `Connection timeout` errors at load peak; pool at max | Hours if not instrumented |
+| ForkJoin task deadlock | Executor saturated; all threads WAITING | Requires code fix; no runtime escape |
 
-1. **JDBC connection pool deadlock** — Thread A holds connection 1 and waits for connection 2; Thread B holds connection 2 and waits for connection 1. Not a JVM lock deadlock — `jstack` shows threads blocked on pool queue. Fix: pool size ≥ (max nested connection depth × thread count), or use flat single-connection transactions.
+**Latency impact:** a deadlocked thread holding a heavily contended lock can chain-stall hundreds of other threads within milliseconds at 100K+ QPS. At P99, a single deadlock event can spike latency from 5 ms to 30 s (lock-wait timeout).
 
-2. **Classloader deadlock** — Two threads trigger class initialization of classes that circularly reference each other. JVM detects this and throws `ClassCircularityError`. Rare but appears in OSGi/plugin systems.
-
-3. **Distributed deadlock** — Microservice A holds a distributed lock in Redis/ZooKeeper and calls service B; B holds a lock and calls A. No single WFG — requires cross-service tracing (distributed deadlock detection is NP-hard in the general case; most teams just use lease timeouts of 1–30 s).
-
-4. **Thread pool induced deadlock** — A task submitted to a fixed-size thread pool blocks waiting for another task that can never be scheduled because the pool is full. Fixed-size `ExecutorService` with subtask fan-out is a classic interview trap.
+---
 
 ### Interview Pitfalls
 
-- **"Deadlocks are rare in production"** — Wrong. Any shared mutable state without disciplined lock ordering can produce them; InnoDB sees them constantly.
-- **Forgetting lock ordering applies to object identity, not variable name** — Two threads passing `(a, b)` and `(b, a)` to the same method need `identityHashCode`-based ordering, not alphabetical.
-- **Using `synchronized` and assuming `interrupt()` works** — `synchronized` blocks are **not interruptible**. Use `ReentrantLock.lockInterruptibly()` for cancellable lock acquisition.
-- **Proposing `Thread.stop()` for recovery** — Deprecated, unsafe, leaves monitors in inconsistent state.
-- **Ignoring pool starvation as deadlock** — Interviewers often describe this scenario; recognize it as a resource deadlock, not a lock deadlock.
+1. **"Just use `synchronized`"** — Interviewers penalize this for any system requiring timeouts or tryLock semantics. Mention `ReentrantLock` explicitly.
+2. **Confusing deadlock with livelock** — Deadlock: threads parked, zero progress. Livelock: threads active, zero progress. CPU profile distinguishes them (100% vs 0%).
+3. **Ignoring `identityHashCode` ties** — Missing the tie-breaking lock in a lock-ordering scheme is a subtle bug that interviewers probe.
+4. **"Banker's Algorithm in production"** — Dijkstra's Banker's Algorithm is theoretically correct for avoidance but requires knowing maximum resource claims upfront — impractical for general-purpose servers. Say you'd use detection + recovery or lock ordering instead.
+5. **Forgetting hidden locks** — `String.intern()`, class loading (`ClassLoader` holds a lock), and serialization (`ObjectOutputStream`) can all participate in deadlocks invisibly. Thread dumps via `jstack -l <pid>` reveal lock owners for all monitors.
 
-### When to Reach for Each Technique
+---
 
-```mermaid
-flowchart TD
-    Q1{"Can you define a\nglobal lock order?"}
-    Q1 -->|Yes| LO["Use lock ordering\nZero runtime cost"]
-    Q1 -->|No| Q2{"Are operations\nindependent / idempotent?"}
-    Q2 -->|Yes| CAS["Use lock-free\nAtomicXxx / ConcurrentHashMap"]
-    Q2 -->|No| Q3{"Can you tolerate\nretry latency?"}
-    Q3 -->|Yes| TL["Use tryLock + jittered backoff"]
-    Q3 -->|No| WFG["Implement WFG detection\n+ kill-youngest recovery\n(DB-style)"]
+### Diagnosis Checklist (Production)
 
-    style LO fill:#2ecc71,color:#000
-    style CAS fill:#2ecc71,color:#000
-    style TL fill:#f39c12,color:#000
-    style WFG fill:#e74c3c,color:#fff
+```
+1. jstack -l <pid>            # look for "Found one Java-level deadlock"
+2. ThreadMXBean alert         # instrument; alert on non-null findDeadlockedThreads()
+3. Java Flight Recorder       # jcmd <pid> JFR.start; analyze MonitorEnterEvent
+4. Heap/CPU baseline          # deadlock = CPU ≈ 0, live threads BLOCKED
+5. DB slow query log          # "Deadlock found when trying to get lock"
 ```
 
-> **Rule of thumb**: Default to lock ordering. Add `tryLock` only when ordering is architecturally impossible (e.g., user-supplied lock objects). Reserve WFG detection for systems where throughput justifies the bookkeeping overhead — primarily databases and transaction managers, not application code.
+---
+
+### When to Reach for Each Strategy
+
+```
+Is the lock set static (known at compile time)?
+├── Yes → Lock ordering (by ID or identityHashCode). Done.
+└── No  → Is max wait time acceptable?
+           ├── Yes → tryLock(timeout) + jitter backoff
+           └── No  → Redesign to eliminate shared mutable state
+                      (lock-free structures, actor model, STM)
+
+Running a database or resource manager?
+└── Build wait-for graph + cycle detection + cheapest-victim rollback
+    (same pattern as InnoDB, PostgreSQL, OS deadlock detectors)
+```
+
+**Rule of thumb:** lock ordering eliminates 90% of application-level deadlocks with zero runtime cost. Reach for `tryLock` only when locks are dynamically determined. Reach for lock-free structures when throughput requirements exceed ~500K ops/sec under contention.

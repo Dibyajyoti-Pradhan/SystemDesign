@@ -152,6 +152,13 @@ export function Chat({ sessionId, initialMessages }: ChatProps) {
           return copy;
         });
       }
+      if (!assistantText) {
+        throw new Error("Empty response from server");
+      }
+      if (assistantText.includes("[error:")) {
+        const match = assistantText.match(/\[error: ([^\]]+)\]/);
+        throw new Error(match ? match[1] : "Stream error from server");
+      }
     } catch (e: unknown) {
       if ((e as { name?: string })?.name === "AbortError") {
         // user-initiated, fine
@@ -221,8 +228,15 @@ export function Chat({ sessionId, initialMessages }: ChatProps) {
       </div>
 
       {error && (
-        <div className="px-4 py-2 text-xs text-destructive bg-destructive/5 border-t border-destructive/20">
-          {error}
+        <div className="px-4 py-2 flex items-center gap-3 text-xs text-destructive bg-destructive/5 border-t border-destructive/20">
+          <span className="flex-1">{error}</span>
+          <button
+            type="button"
+            className="underline shrink-0"
+            onClick={() => setError(null)}
+          >
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -245,7 +259,7 @@ export function Chat({ sessionId, initialMessages }: ChatProps) {
             disabled={streaming || grading || messages.length < 2}
           >
             {grading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-            {grading ? "Grading..." : "End interview"}
+            {grading ? "Grading..." : "End & grade"}
           </Button>
           <div className="flex items-center gap-2">
             {streaming && (

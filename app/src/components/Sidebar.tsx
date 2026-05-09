@@ -13,11 +13,11 @@ const NAV: Array<{ slug: "topics" | "questions" | "review" | "cheatsheets"; labe
   { slug: "cheatsheets", label: "Cheatsheets", icon: Layers },
 ];
 
-function activeTrack(pathname: string): Track {
+function activeTrack(pathname: string): Track | null {
   for (const t of TRACKS) {
     if (pathname === `/${t}` || pathname.startsWith(`/${t}/`)) return t;
   }
-  return "system-design";
+  return null;
 }
 
 export function Sidebar() {
@@ -27,8 +27,8 @@ export function Sidebar() {
   return (
     <aside className="w-56 shrink-0 border-r bg-muted/20 h-screen sticky top-0">
       <div className="p-5 border-b">
-        <Link href={`/${track}`} className="block">
-          <h1 className="text-base font-semibold tracking-tight">Career Lab</h1>
+        <Link href={track ? `/${track}` : "/"} className="block">
+          <div className="text-base font-semibold tracking-tight">Career Lab</div>
         </Link>
       </div>
 
@@ -39,7 +39,7 @@ export function Sidebar() {
               key={t}
               href={`/${t}`}
               className={cn(
-                "text-center text-xs font-medium py-1.5 rounded transition-colors",
+                "text-center text-xs font-medium py-1.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 t === track ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -50,7 +50,7 @@ export function Sidebar() {
       </div>
 
       <nav className="p-2">
-        {NAV.map((item) => {
+        {track && NAV.map((item) => {
           const Icon = item.icon;
           const href = `/${track}/${item.slug}`;
           const isActive = pathname === href || pathname.startsWith(`${href}/`);
@@ -59,7 +59,7 @@ export function Sidebar() {
               key={item.slug}
               href={href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 isActive ? "bg-accent text-foreground" : "text-foreground hover:bg-accent",
               )}
             >

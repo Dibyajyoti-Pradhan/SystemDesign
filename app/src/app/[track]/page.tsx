@@ -119,13 +119,6 @@ export default async function TrackHome({
                 </Badge>
               )}
             </p>
-            {pendingCount.n > 0 && (
-              <Button asChild variant="ghost" size="sm" className="px-0 h-auto">
-                <Link href="/admin/cards">
-                  Review queue <ArrowRight className="h-3 w-3" />
-                </Link>
-              </Button>
-            )}
           </CardContent>
         </Card>
       </section>

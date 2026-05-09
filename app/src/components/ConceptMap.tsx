@@ -22,6 +22,7 @@ export type ConceptMapTopic = {
   categoryOrder: number;
   topicOrder: number;
   mastery: number;
+  track: string;
 };
 
 export type ConceptMapLink = {
@@ -99,6 +100,7 @@ export function ConceptMap({
             bg: CATEGORY_COLORS[ci % CATEGORY_COLORS.length],
             mastery: t.mastery,
             slug: t.slug,
+            track: t.track,
           },
         });
       });
@@ -117,8 +119,8 @@ export function ConceptMap({
 
   const onNodeClick = useCallback(
     (_: any, node: Node) => {
-      const slug = (node.data as any).slug;
-      if (slug) router.push(`/topics/${slug}`);
+      const { slug, track } = node.data as any;
+      if (slug && track) router.push(`/${track}/topics/${slug}`);
     },
     [router],
   );

@@ -130,9 +130,6 @@ export function ReviewSession({
             <Button asChild variant="outline" size="sm">
               <Link href={`/${track}/topics`}>Browse topics</Link>
             </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/cards">Pending cards</Link>
-            </Button>
           </div>
         </CardContent>
       </Card>

@@ -209,6 +209,16 @@ The interview is wrapping up. Keep this turn tight — summarize tradeoffs you'd
     async start(controller) {
       const encoder = new TextEncoder();
       let assistantText = "";
+      let closed = false;
+      const safeEnqueue = (chunk: Uint8Array) => {
+        if (!closed) controller.enqueue(chunk);
+      };
+      const safeClose = () => {
+        if (!closed) {
+          closed = true;
+          try { controller.close(); } catch {}
+        }
+      };
       try {
         for await (const delta of claudeStream({
           systemPrompt: systemText,
@@ -216,12 +226,12 @@ The interview is wrapping up. Keep this turn tight — summarize tradeoffs you'd
           model: "sonnet",
         })) {
           assistantText += delta;
-          controller.enqueue(encoder.encode(delta));
+          safeEnqueue(encoder.encode(delta));
         }
       } catch (err) {
         console.error("[ai-vs-ai] stream error", err);
         const msg = err instanceof Error ? err.message : String(err);
-        controller.enqueue(encoder.encode(`\n\n[error: ${msg}]`));
+        safeEnqueue(encoder.encode(`\n\n[error: ${msg}]`));
       } finally {
         if (assistantText.trim().length > 0) {
           const finalTranscript: StoredMsg[] = [
@@ -237,7 +247,7 @@ The interview is wrapping up. Keep this turn tight — summarize tradeoffs you'd
             console.error("[ai-vs-ai] failed to persist transcript", e);
           }
         }
-        controller.close();
+        safeClose();
       }
     },
   });

@@ -1,11 +1,14 @@
 node_modules
+node_modules.nosync
 .next
+.next.nosync
 .env
 .env.local
 data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+data.nosync
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts

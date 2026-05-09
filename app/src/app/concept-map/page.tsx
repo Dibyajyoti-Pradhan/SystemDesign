@@ -28,6 +28,7 @@ export default async function ConceptMapPage() {
           categoryOrder: t.categoryOrder,
           topicOrder: t.topicOrder,
           mastery: t.mastery,
+          track: t.track,
         }))}
         links={links.map((l) => ({
           fromTopicId: l.fromTopicId,

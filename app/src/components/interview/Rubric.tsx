@@ -68,7 +68,7 @@ export function Rubric({ data }: { data: RubricData }) {
               <div key={key} className="space-y-1">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{SECTION_LABELS[key]}</span>
-                  <span className={`tabular-nums ${scoreColor(v)}`}>{v}</span>
+                  <span className={`tabular-nums ${scoreColor(v)}`}>{v} / 100</span>
                 </div>
                 <Progress value={v} />
               </div>

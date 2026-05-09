@@ -140,7 +140,15 @@ export default async function QuestionDetailPage({
             </CardContent>
           </Card>
         </section>
-      ) : null}
+      ) : (
+        <section className="space-y-3">
+          <Card>
+            <CardContent className="py-6">
+              <p className="text-sm text-muted-foreground italic">No description available.</p>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {sessions.length > 0 && (
         <section className="space-y-3">

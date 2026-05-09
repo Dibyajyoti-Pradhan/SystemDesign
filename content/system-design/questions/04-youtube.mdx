@@ -1,0 +1,30 @@
+---
+title: Design YouTube
+slug: 04-youtube
+---
+
+# Problem
+Design a global video streaming platform where users can upload, watch, search, and interact with videos at massive scale — similar to YouTube.
+
+## Functional requirements
+- Upload video with chunked, resumable uploads and progress tracking
+- Stream video with adaptive bitrate, seek support, and low startup latency
+- Search videos by title, tags, and category; surface trending content
+- Personalized video recommendations based on watch history
+- Comments, likes, and channel subscriptions with notifications
+
+## Scale & non-functional
+- DAU: ~500M MAU (2B total registered users)
+- Upload volume: 500 hours of video uploaded per minute
+- Watch volume: ~1B hours/day; ~11.6M concurrent viewers at peak
+- Video startup latency: <2s (p99)
+- Search latency: <100ms (p99)
+- Availability: 99.99%
+- Storage growth: ~300 TB/day transcoded; ~110 PB/year
+- Storage durability: 11 nines
+
+## Out of scope
+- Live streaming
+- Monetization / ads serving
+- Creator analytics dashboard
+- DRM / content licensing enforcement

@@ -96,7 +96,7 @@ export default async function InterviewSessionPage({
     <div className="max-w-6xl mx-auto p-8 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link
-          href={`/${question.track}/questions`}
+          href={`/${question.track}/questions/${question.slug}`}
           className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
         >
           <ArrowLeft className="h-4 w-4" /> Practice

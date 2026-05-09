@@ -3,9 +3,11 @@
 // AI-vs-AI steer, search, plus 1 light AI smoke (assistant chat).
 
 import { execSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const BASE = "http://localhost:3000";
-const DB = "/Users/dibyajyotipradhan/Desktop/Career Hub/SystemDesign/app/data/study.db";
+const DB = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data", "study.db");
 
 function sqlite(query) {
   return execSync(`sqlite3 "${DB}" "${query.replace(/"/g, '\\"')}"`, { encoding: "utf8" }).trim();
