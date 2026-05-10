@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { claudeStream } from "@/lib/claude-cli";
+import { claudeStream } from "@/lib/anthropic";
 import { ASSISTANT_SYSTEM_PROMPT, resolvePageContext } from "@/lib/assistantContext";
 
 export const runtime = "nodejs";

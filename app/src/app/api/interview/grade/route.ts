@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { claudeRun } from "@/lib/claude-cli";
+import { claudeRun } from "@/lib/anthropic";
 import { buildGradingPrompt } from "@/lib/interviewer";
 
 export const runtime = "nodejs";

@@ -1,3 +1,4 @@
+// @deprecated — use src/lib/anthropic.ts instead (Anthropic SDK direct, no CLI subprocess)
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 
 export class ClaudeCliError extends Error {

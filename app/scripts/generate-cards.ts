@@ -1,7 +1,7 @@
 import { db } from "../src/db/client";
 import { cards, topics } from "../src/db/schema";
 import { eq } from "drizzle-orm";
-import { claudeRun } from "../src/lib/claude-cli";
+import { claudeRun } from "../src/lib/anthropic";
 import { readTopicMdx } from "../src/lib/mdx";
 
 const SYSTEM_PROMPT = `You are an expert system-design educator generating spaced-repetition flashcards for a senior engineer preparing for FAANG-level interviews.
@@ -129,6 +129,7 @@ Generate ${n} flashcards now. Return them as { "cards": [...] } per the schema.`
     .insert(cards)
     .values(
       valid.map((c) => ({
+        userId: "system", // TODO: replace with real user id when auth is wired
         topicId: topic.id,
         type: c.type,
         front: c.front.trim(),

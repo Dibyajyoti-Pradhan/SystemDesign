@@ -3,7 +3,7 @@ import path from "node:path";
 import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { claudeStream } from "@/lib/claude-cli";
+import { claudeStream } from "@/lib/anthropic";
 import {
   buildInterviewerSystemPrompt,
   buildCandidateSystemPrompt,

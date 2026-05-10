@@ -3,7 +3,7 @@ import path from "node:path";
 import { db } from "../src/db/client";
 import { topics } from "../src/db/schema";
 import { eq } from "drizzle-orm";
-import { claudeRun } from "../src/lib/claude-cli";
+import { claudeRun } from "../src/lib/anthropic";
 import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "../src/lib/paths";
 import { slugify } from "../src/lib/utils";
 

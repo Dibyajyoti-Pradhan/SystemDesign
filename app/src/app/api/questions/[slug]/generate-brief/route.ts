@@ -4,7 +4,7 @@ import path from "node:path";
 import { db } from "@/db/client";
 import { questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { claudeRun } from "@/lib/claude-cli";
+import { claudeRun } from "@/lib/anthropic";
 import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "@/lib/paths";
 import { extractSourceText } from "@/lib/sourceExtract";
 
