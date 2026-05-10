@@ -61,6 +61,7 @@ export async function POST(
     .where(eq(cards.id, id));
 
   await db.insert(reviews).values({
+    userId: "system", // TODO: replace with real user id when auth is wired
     cardId: id,
     rating,
     prevInterval,

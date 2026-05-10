@@ -45,6 +45,7 @@ async function seedTopicsForTrack(track: Track) {
       if (!t) continue;
       const slug = slugify(`${cat.category}-${t.title}`);
       rows.push({
+        userId: "system", // TODO: replace with real user id when auth is wired
         track,
         slug,
         category: cat.category,
@@ -106,6 +107,7 @@ async function seedQuestionsForTrack(track: Track) {
           const result = await db
             .insert(questions)
             .values({
+              userId: "system", // TODO: replace with real user id when auth is wired
               track,
               language: lang,
               slug,
@@ -139,6 +141,7 @@ async function seedQuestionsForTrack(track: Track) {
       const result = await db
         .insert(questions)
         .values({
+          userId: "system", // TODO: replace with real user id when auth is wired
           track,
           slug,
           number: q.number,

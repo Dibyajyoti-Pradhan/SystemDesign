@@ -16,6 +16,7 @@ export default async function StartInterviewPage({
   const inserted = await db
     .insert(interviewSessions)
     .values({
+      userId: "system", // TODO: replace with real user id when auth is wired
       questionId: q.id,
       transcript: "[]",
     })

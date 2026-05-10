@@ -11,6 +11,7 @@ export default async function StartAiVsAi({ params }: { params: Promise<{ slug: 
   const [created] = await db
     .insert(interviewSessions)
     .values({
+      userId: "system", // TODO: replace with real user id when auth is wired
       questionId: q.id,
       mode: "ai_vs_ai",
       transcript: "[]",

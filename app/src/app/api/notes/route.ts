@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
   const [row] = await db
     .insert(notes)
     .values({
+      userId: "system", // TODO: replace with real user id when auth is wired
       body: parsed.data.body,
       topicId: parsed.data.topicId ?? null,
       questionId: parsed.data.questionId ?? null,

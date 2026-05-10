@@ -162,6 +162,7 @@ async function main() {
     } else {
       try {
         await db.insert(topics).values({
+          userId: "system", // TODO: replace with real user id when auth is wired
           track: "coding",
           language: "java",
           slug,
