@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2 } from "lucide-react";
 
 export function GenerateTopicButton({ slug }: { slug: string }) {
   const router = useRouter();
@@ -33,24 +31,29 @@ export function GenerateTopicButton({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="space-y-2">
-      <Button onClick={trigger} disabled={pending}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <button className="btn btn--primary" onClick={trigger} disabled={pending} style={{ alignSelf: "flex-start" }}>
         {pending ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Generating… ({eta}s)
+            <svg style={{ width: 13, height: 13, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            Generating… ({eta}s)
           </>
         ) : (
           <>
-            <Sparkles className="h-4 w-4" /> Generate this page from PDF
+            <svg style={{ width: 13, height: 13 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Generate this page from PDF
           </>
         )}
-      </Button>
+      </button>
       {pending && (
-        <p className="text-xs text-muted-foreground">
-          Claude is reading the PDF and writing TL;DR / Standard / Deep sections with diagrams. ~30-60s.
-        </p>
+        <span style={{ fontSize: 12, color: "var(--mute)", fontFamily: "var(--font-mono)" }}>
+          Claude is reading the PDF and writing TL;DR / Standard / Deep sections with diagrams. ~30–60s.
+        </span>
       )}
-      {error && <p className="text-xs text-destructive">Generation failed: {error}</p>}
+      {error && (
+        <span style={{ fontSize: 12, color: "var(--bad)" }}>Generation failed: {error}</span>
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -2,15 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { topics, topicLinks, cards } from "@/db/schema";
-import { eq, and, or, count, inArray } from "drizzle-orm";
+import { eq, and, count, inArray } from "drizzle-orm";
 import { readTopicMdx } from "@/lib/mdx";
 import { MdxRenderer } from "@/components/MdxRenderer";
 import { DepthTabs } from "@/components/DepthTabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ExternalLink, FileText, Sparkles } from "lucide-react";
 import { GenerateTopicButton } from "@/components/topic/GenerateTopicButton";
 import { parseTrack } from "@/lib/paths";
 import { relativeTime } from "@/lib/utils";
@@ -47,6 +42,14 @@ const CSS = `
 .rail__toc-item { display:block; font-size: 12px; color: var(--mute); padding: 4px 0; text-decoration: none; border-bottom: 1px solid transparent; }
 .rail__toc-item:hover { color: var(--ink); }
 .depth-wrap { padding-top: 4px; }
+.gen-box { padding: 20px; display:flex; flex-direction:column; gap:14px; margin-bottom: 16px; }
+.gen-box__head { display:flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.gen-box__desc { font-size: 13px; color: var(--mute); line-height: 1.6; margin: 0; }
+.src-box { overflow:hidden; }
+.src-box__head { display:flex; align-items:center; justify-content:space-between; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+.src-box__title { display:flex; align-items:center; gap: 7px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.src-box iframe { display:block; width:100%; height:75vh; border:0; }
+.src-box__docx { padding: 16px; font-size: 13px; color: var(--mute); display:flex; flex-direction:column; gap:6px; }
 .ruler { margin: 24px 0 28px; }
 .ruler__row { display:grid; grid-template-columns: repeat(3, 1fr); position: relative; padding: 10px 0 22px; }
 .ruler__row::before { content:""; position:absolute; left:0; right:0; bottom: 14px; height:1px; background: var(--line); }
@@ -59,53 +62,34 @@ const CSS = `
 .ruler__tick.is-on::after { background: var(--accent); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(212,165,116,0.15); }
 `;
 
-/**
- * Source-file card. Inlines the iframe only for PDFs and plain text;
- * .docx/.doc are not browser-renderable inline so we offer a download
- * link plus a nudge to use the Generate button.
- */
 function SourceCard({ pdfPath, title }: { pdfPath: string; title: string }) {
   const ext = pdfPath.toLowerCase().match(/\.([^.]+)$/)?.[1] ?? "";
   const isPdf = ext === "pdf";
-  const isInlineText = ext === "md" || ext === "mdx" || ext === "txt";
-  const inlinable = isPdf || isInlineText;
   const sourceLabel = ext.toUpperCase();
   const url = `/api/pdf?path=${encodeURIComponent(pdfPath)}`;
+  const inlinable = isPdf || ext === "md" || ext === "mdx" || ext === "txt";
 
   return (
-    <Card>
-      <CardHeader className="pb-3 flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileText className="h-4 w-4" /> Source {sourceLabel}
-        </CardTitle>
-        <Button variant="outline" size="sm" asChild>
-          <a href={url} target="_blank" rel="noopener">
-            <ExternalLink className="h-4 w-4" />
-            {inlinable ? "Open in new tab" : "Download"}
-          </a>
-        </Button>
-      </CardHeader>
+    <div className="card src-box">
+      <div className="src-box__head">
+        <span className="src-box__title">
+          <svg className="ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Source {sourceLabel}
+        </span>
+        <a href={url} target="_blank" rel="noopener" className="btn btn--ghost" style={{ fontSize: 12, padding: "4px 10px" }}>
+          <svg className="ico" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          {inlinable ? "Open in new tab" : "Download"}
+        </a>
+      </div>
       {isPdf ? (
-        <CardContent className="p-0">
-          <iframe
-            src={`${url}#view=FitH`}
-            className="w-full h-[75vh] rounded-b-lg border-t"
-            title={`${title} (PDF)`}
-          />
-        </CardContent>
+        <iframe src={`${url}#view=FitH`} title={`${title} (PDF)`} />
       ) : (
-        <CardContent className="border-t pt-4 space-y-2">
-          <p className="text-sm text-muted-foreground">
-            {ext === "docx" || ext === "doc"
-              ? "Word documents can't preview inline — use the button above to download."
-              : `${sourceLabel} source — open in a new tab to view.`}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Or hit <strong>Generate this page from PDF</strong> above to read the rich version directly.
-          </p>
-        </CardContent>
+        <div className="src-box__docx">
+          <span>{ext === "docx" || ext === "doc" ? "Word documents can't preview inline — use the button above to download." : `${sourceLabel} source — open in a new tab to view.`}</span>
+          <span style={{ color: "var(--mute-2)", fontSize: 12 }}>Or use Generate above to read the rich version directly.</span>
+        </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -224,24 +208,20 @@ export default async function TopicPage({
                 />
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Sparkles className="h-4 w-4" /> Turn this PDF into an interactive page
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Generate a structured TL;DR / Standard / Deep view with Mermaid diagrams from the source PDF.
-                      Uses your Claude Code subscription. ~30–60 seconds.
-                    </p>
-                    <GenerateTopicButton slug={topic.slug} />
-                  </CardContent>
-                </Card>
-
+              <>
+                <div className="card gen-box">
+                  <div className="gen-box__head">
+                    <svg className="ico" viewBox="0 0 24 24" style={{ color: "var(--accent)" }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Turn this PDF into an interactive page
+                  </div>
+                  <p className="gen-box__desc">
+                    Generate a structured TL;DR / Standard / Deep view with Mermaid diagrams from the source PDF.
+                    Uses your Claude Code subscription. ~30–60 seconds.
+                  </p>
+                  <GenerateTopicButton slug={topic.slug} />
+                </div>
                 {topic.pdfPath && <SourceCard pdfPath={topic.pdfPath} title={topic.title} />}
-              </div>
+              </>
             )}
           </div>
         </div>
