@@ -4,6 +4,8 @@ import { users, FREE_FOREVER_EMAIL } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 
 export async function requireUser(): Promise<string> {
+  // Local dev: no auth required — everyone is "dev-user"
+  if (process.env.NODE_ENV === 'development') return 'dev-user'
   const session = await auth()
   if (!session?.user?.id) throw new Error('Unauthorized')
   return session.user.id

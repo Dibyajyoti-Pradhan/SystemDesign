@@ -19,28 +19,42 @@ function log(msg: string) {
 
 // ── 1. .env.local ────────────────────────────────────────────────────────────
 const envPath = path.join(ROOT, ".env.local");
+const SQLITE_URL = "sqlite:./local.db";
+
+const defaultEnv = [
+  "# Auth — stripped for local dev",
+  "NEXTAUTH_SECRET=local-dev-secret-change-in-production",
+  "NEXTAUTH_URL=http://localhost:3000",
+  "",
+  "# Database — SQLite for local dev",
+  `DATABASE_URL=${SQLITE_URL}`,
+  "",
+  "# Anthropic — leave EMPTY so the claude CLI fallback is used",
+  "ANTHROPIC_API_KEY=",
+  "",
+  "# Dev mode",
+  "NODE_ENV=development",
+  "",
+].join("\n");
+
 if (!fs.existsSync(envPath)) {
   log(".env.local not found — creating with SQLite defaults");
-  fs.writeFileSync(
-    envPath,
-    [
-      "# Auth — stripped for local dev",
-      "NEXTAUTH_SECRET=local-dev-secret-change-in-production",
-      "NEXTAUTH_URL=http://localhost:3000",
-      "",
-      "# Database — SQLite for local dev",
-      "DATABASE_URL=sqlite:./local.db",
-      "",
-      "# Anthropic — leave EMPTY so the claude CLI fallback is used",
-      "ANTHROPIC_API_KEY=",
-      "",
-      "# Dev mode",
-      "NODE_ENV=development",
-      "",
-    ].join("\n")
-  );
+  fs.writeFileSync(envPath, defaultEnv);
 } else {
-  log(".env.local already exists — skipping");
+  // Ensure DATABASE_URL is SQLite — fix it if pointing at PostgreSQL/Neon
+  const existing = fs.readFileSync(envPath, "utf8");
+  const match = existing.match(/^DATABASE_URL=(.*)$/m);
+  const currentUrl = match?.[1]?.trim() ?? "";
+  const isSqlite = !currentUrl || currentUrl.startsWith("sqlite:") || currentUrl === "FILL_FROM_NEON";
+  if (!isSqlite) {
+    log(`DATABASE_URL is PostgreSQL ("${currentUrl.slice(0, 40)}...") — rewriting to SQLite for local dev`);
+    const updated = existing.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL=${SQLITE_URL}`);
+    fs.writeFileSync(envPath, updated);
+    // Force re-read of env for subsequent steps in this script
+    process.env.DATABASE_URL = SQLITE_URL;
+  } else {
+    log(".env.local already uses SQLite — skipping");
+  }
 }
 
 // ── 2. DB schema push ────────────────────────────────────────────────────────
