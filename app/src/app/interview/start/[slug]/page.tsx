@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { auth } from "@/auth";
 import { db } from "@/db/client";
 import { questions, interviewSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,6 +10,9 @@ export default async function StartInterviewPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/sign-in");
+
   const { slug } = await params;
   const [q] = await db.select().from(questions).where(eq(questions.slug, slug)).limit(1);
   if (!q) notFound();
@@ -16,7 +20,7 @@ export default async function StartInterviewPage({
   const inserted = await db
     .insert(interviewSessions)
     .values({
-      userId: "system", // TODO: replace with real user id when auth is wired
+      userId: session.user.id,
       questionId: q.id,
       transcript: "[]",
     })
