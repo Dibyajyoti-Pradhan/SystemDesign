@@ -1,9 +1,10 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { claudeStream } from "@/lib/anthropic";
+import { apiAuthGuard } from "@/lib/auth-guards";
 import {
   buildInterviewerSystemPrompt,
   buildCandidateSystemPrompt,
@@ -89,6 +90,9 @@ function buildHistoryForAgent(
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof NextResponse) return guard;
+
   let body: { sessionId?: number } = {};
   try {
     body = await req.json();

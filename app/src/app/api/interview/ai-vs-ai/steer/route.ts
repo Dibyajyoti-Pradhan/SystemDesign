@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { interviewSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { apiAuthGuard } from "@/lib/auth-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof NextResponse) return guard;
+
   let json: unknown;
   try {
     json = await req.json();

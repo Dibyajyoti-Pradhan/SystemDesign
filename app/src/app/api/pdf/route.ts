@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { REPO_ROOT } from "@/lib/paths";
+import { apiAuthGuard } from "@/lib/auth-guards";
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -13,6 +14,9 @@ const CONTENT_TYPE_BY_EXT: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof NextResponse) return guard;
+
   const rel = req.nextUrl.searchParams.get("path");
   if (!rel) return new NextResponse("Missing path", { status: 400 });
 

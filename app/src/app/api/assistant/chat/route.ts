@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { claudeStream } from "@/lib/anthropic";
 import { ASSISTANT_SYSTEM_PROMPT, resolvePageContext } from "@/lib/assistantContext";
+import { apiAuthGuard } from "@/lib/auth-guards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +37,9 @@ function formatHistoryAsPrompt(messages: ChatMessage[], pageContext: string | nu
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof Response) return guard;
+
   let body: Body;
   try {
     body = await req.json();

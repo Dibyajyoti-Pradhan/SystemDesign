@@ -3,11 +3,14 @@ import { db } from "@/db/client";
 import { cards } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { apiAuthGuard } from "@/lib/auth-guards";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof NextResponse) return guard;
   const { id: idStr } = await params;
   const id = Number(idStr);
   if (!Number.isFinite(id)) {
@@ -53,6 +56,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const guard = await apiAuthGuard();
+  if (guard instanceof NextResponse) return guard;
+
   const { id: idStr } = await params;
   const id = Number(idStr);
   if (!Number.isFinite(id)) {
