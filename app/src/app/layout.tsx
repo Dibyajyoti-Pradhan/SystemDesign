@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { AssistantPanel } from "@/components/AssistantPanel";
+import { DevLoggerInit } from "@/components/DevLoggerInit";
 
 export const metadata: Metadata = {
   title: { default: "CareerLab", template: "%s · CareerLab" },
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="main">{children}</main>
           <AssistantPanel />
         </div>
+        {process.env.NODE_ENV !== "production" && <DevLoggerInit />}
       </body>
     </html>
   );

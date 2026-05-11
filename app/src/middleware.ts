@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// No-op middleware — auth has been stripped; all routes are public.
-export function middleware(_req: NextRequest) {
+// Logs inbound requests to the dev terminal in development.
+// The unified file log lives at app/dev.log — server routes write via
+// lib/devlog.ts, client posts to /api/log.
+export function middleware(req: NextRequest) {
+  if (process.env.NODE_ENV !== "production") {
+    const { pathname, search } = req.nextUrl;
+    if (!pathname.startsWith("/api/log") && !pathname.startsWith("/_next")) {
+      console.log(`[req] ${req.method} ${pathname}${search}`);
+    }
+  }
   return NextResponse.next();
 }
 

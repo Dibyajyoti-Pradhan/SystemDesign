@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from "react";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,19 +9,37 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  useEffect(() => {
+    // Ship to unified dev log so we can grep both sides in one file.
+    if (process.env.NODE_ENV !== "production") {
+      fetch("/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: "error",
+          url: typeof location !== "undefined" ? location.pathname + location.search : undefined,
+          message: "ErrorBoundary: " + (error?.message ?? "unknown"),
+          stack: error?.stack,
+          meta: { digest: error?.digest },
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }, [error]);
+
   return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div className="text-center space-y-4 max-w-md">
-        <h2 className="text-2xl font-bold tracking-tight">Something went wrong</h2>
-        <p className="text-muted-foreground text-sm">
+    <div style={{ minHeight: "60vh", display: "grid", placeItems: "center", padding: "32px 16px" }}>
+      <div style={{ textAlign: "center", maxWidth: 520, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.022em", color: "var(--ink)" }}>Something went wrong</h2>
+        <p style={{ color: "var(--mute)", fontSize: 14, lineHeight: 1.5 }}>
           {error.message || 'An unexpected error occurred. Please try again.'}
         </p>
-        <button
-          onClick={reset}
-          className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          Try again
-        </button>
+        {error?.digest && (
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute-2)" }}>digest: {error.digest}</p>
+        )}
+        <div>
+          <button onClick={reset} className="btn btn--primary">Try again</button>
+        </div>
       </div>
     </div>
   )

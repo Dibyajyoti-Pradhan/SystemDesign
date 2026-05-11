@@ -16,3 +16,7 @@ data.nosync
 *.tsbuildinfo
 next-env.d.ts
 .drizzle
+
+# dev logger output
+dev.log
+dev.log.prev

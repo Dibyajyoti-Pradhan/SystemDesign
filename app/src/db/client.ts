@@ -9,6 +9,11 @@ function makeSqliteDb() {
   const { drizzle } = require("drizzle-orm/better-sqlite3");
   const sqlite = new Database(path);
   sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("synchronous = NORMAL");
+  // Wait up to 5s for a held lock before throwing SQLITE_BUSY (which surfaces
+  // as "disk I/O error" through better-sqlite3 in some cases).
+  sqlite.pragma("busy_timeout = 5000");
+  sqlite.pragma("foreign_keys = ON");
   return drizzle(sqlite, { schema });
 }
 
