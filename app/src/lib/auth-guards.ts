@@ -18,6 +18,8 @@ import { redirect } from 'next/navigation'
  *   const { userId } = result
  */
 export async function apiAuthGuard(): Promise<{ userId: string } | NextResponse> {
+  if (process.env.NODE_ENV === 'development') return { userId: 'dev-user' }
+
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -50,6 +52,8 @@ export async function apiAuthGuard(): Promise<{ userId: string } | NextResponse>
  * Redirects to `/sign-in` if unauthenticated, or `/upgrade` if trial expired.
  */
 export async function requireAuthOrRedirect(): Promise<string> {
+  if (process.env.NODE_ENV === 'development') return 'dev-user'
+
   const session = await auth()
   if (!session?.user?.id) {
     redirect('/sign-in')
