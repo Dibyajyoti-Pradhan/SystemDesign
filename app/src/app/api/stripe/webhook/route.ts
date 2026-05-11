@@ -4,6 +4,7 @@ import { db } from '@/db/client'
 import { users } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import Stripe from 'stripe'
+import { track } from '@/lib/analytics'
 
 export async function POST(req: NextRequest) {
   const body = await req.text()
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
         .update(users)
         .set({ plan: 'paid', trialEndsAt: null })
         .where(eq(users.email, email))
+      track('subscription_start', { email, customerId: session.customer })
     }
   }
 

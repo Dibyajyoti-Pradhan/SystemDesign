@@ -4,6 +4,8 @@ import { db } from '@/db/client'
 import { users, FREE_FOREVER_EMAIL } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import logger from '@/lib/logger'
+import { track } from '@/lib/analytics'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -32,6 +34,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }).returning({ id: users.id })
           token.sub = newUser[0]?.id
           logger.info({ email: user.email, userId: newUser[0]?.id, plan: isForeverFree ? 'free' : 'trial' }, 'new user created')
+          track('signup', { userId: newUser[0]?.id, email: user.email, plan: isForeverFree ? 'free' : 'trial' })
+          if (!isForeverFree) {
+            track('trial_start', { userId: newUser[0]?.id, email: user.email })
+            sendWelcomeEmail(user.email, user.name ?? user.email).catch(() => { /* fire-and-forget */ })
+          }
         } else {
           token.sub = existing[0]?.id
           logger.info({ email: user.email, userId: existing[0]?.id }, 'existing user signed in')

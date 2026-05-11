@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiAuthGuard } from "@/lib/auth-guards";
 import { claudeRun } from "@/lib/anthropic";
+import { track } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -124,6 +125,8 @@ export async function POST(
     efficiency: clampScore(p.efficiency),
     summary: typeof p.summary === "string" ? p.summary : "",
   };
+
+  track('interview_complete', { communication: score.communication, correctness: score.correctness, efficiency: score.efficiency })
 
   return NextResponse.json(score);
 }

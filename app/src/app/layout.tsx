@@ -3,6 +3,7 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import { Sidebar } from "@/components/Sidebar";
 import { AssistantPanel } from "@/components/AssistantPanel";
+import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 import { auth } from "@/auth";
 import { checkGate } from "@/lib/gate";
 import { redirect } from "next/navigation";
@@ -52,7 +53,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <SessionProvider session={session}>
         <html lang="en" className="scroll-smooth">
           <body className="antialiased bg-zinc-950 text-zinc-100">
-            {children}
+            <AnalyticsProvider>
+              {children}
+            </AnalyticsProvider>
           </body>
         </html>
       </SessionProvider>
@@ -63,11 +66,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <SessionProvider session={session}>
       <html lang="en">
         <body className="antialiased">
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 min-w-0">{children}</main>
-          </div>
-          <AssistantPanel />
+          <AnalyticsProvider>
+            <div className="flex min-h-screen">
+              <Sidebar />
+              <main className="flex-1 min-w-0">{children}</main>
+            </div>
+            <AssistantPanel />
+          </AnalyticsProvider>
         </body>
       </html>
     </SessionProvider>
