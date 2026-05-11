@@ -88,7 +88,7 @@ if (needsPush) {
 }
 
 // ── 3. Seed ──────────────────────────────────────────────────────────────────
-const MIN_TOPICS = 18; // bump seed-local.ts SEED_VERSION when you add more
+const MIN_TOPICS = 90; // must be <= total seeded topics (currently 93)
 try {
   const Database = require("better-sqlite3");
   const db = new Database(dbPath);
