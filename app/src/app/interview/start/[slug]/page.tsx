@@ -1,11 +1,10 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import Link from "next/link";
 import { db } from "@/db/client";
-import { questions, interviewSessions } from "@/db/schema";
+import { questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { StartInterviewButton } from "@/components/interview/StartInterviewButton";
 
-const DEV_USER_ID = "dev-user";
-
-// Server component: create a fresh session row, redirect.
 export default async function StartInterviewPage({
   params,
 }: {
@@ -15,18 +14,35 @@ export default async function StartInterviewPage({
   const [q] = await db.select().from(questions).where(eq(questions.slug, slug)).limit(1);
   if (!q) notFound();
 
-  const inserted = await db
-    .insert(interviewSessions)
-    .values({
-      userId: DEV_USER_ID,
-      questionId: q.id,
-      transcript: "[]",
-    })
-    .returning({ id: interviewSessions.id });
-
-  const id = inserted[0]?.id;
-  if (!id) {
-    throw new Error("Failed to create interview session");
-  }
-  redirect(`/interview/sessions/${id}`);
+  return (
+    <>
+      <style dangerouslySetInnerHTML={{ __html: `
+        .si { height:100%; display:grid; place-items:center; padding: 40px; }
+        .si__card { max-width: 540px; width:100%; background: var(--surf); border:1px solid var(--line); border-radius: var(--r-3); padding: 36px; display:flex; flex-direction:column; gap: 22px; }
+        .si__mode { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; }
+        .si__t { font-size: 26px; font-weight: 600; letter-spacing: -0.022em; line-height: 1.15; }
+        .si__meta { display:flex; gap: 8px; }
+        .si__desc { font-size: 14px; color: var(--mute); line-height: 1.6; }
+        .si__actions { display:flex; gap: 10px; padding-top: 6px; }
+      ` }} />
+      <div className="si">
+        <div className="si__card">
+          <div className="si__mode">Self practice</div>
+          <div className="si__t">{q.title}</div>
+          <div className="si__meta">
+            <span className="badge">#{String(q.number ?? 0).padStart(2, "0")}</span>
+            <span className="badge">{q.difficulty}</span>
+            <span className="badge">~{q.estMinutes} min</span>
+          </div>
+          <div className="si__desc">
+            You&apos;ll answer while an AI interviewer asks follow-up questions and pushes back on your design. A rubric score is generated when you end the session.
+          </div>
+          <div className="si__actions">
+            <StartInterviewButton slug={slug} mode="self" />
+            <Link href={`/system-design/questions/${slug}`} className="btn btn--ghost">Cancel</Link>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }

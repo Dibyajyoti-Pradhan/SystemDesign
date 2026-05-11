@@ -52,8 +52,10 @@ export default async function NotesPage({
       n: notes,
       topicTitle: topics.title,
       topicSlug: topics.slug,
+      topicTrack: topics.track,
       questionTitle: questions.title,
       questionSlug: questions.slug,
+      questionTrack: questions.track,
     })
     .from(notes)
     .leftJoin(topics, eq(notes.topicId, topics.id))
@@ -61,7 +63,7 @@ export default async function NotesPage({
     .orderBy(desc(notes.updatedAt))
     .limit(50);
 
-  const grouped = groupByDate(allNotes as Array<{ n: { updatedAt: Date | null }; topicTitle: string | null; topicSlug: string | null; questionTitle: string | null; questionSlug: string | null }>);
+  const grouped = groupByDate(allNotes as Array<{ n: { updatedAt: Date | null }; topicTitle: string | null; topicSlug: string | null; topicTrack: string | null; questionTitle: string | null; questionSlug: string | null; questionTrack: string | null }>);
 
   return (
     <>
@@ -108,19 +110,19 @@ export default async function NotesPage({
           {grouped.map(([label, items]) => (
             <div key={label}>
               <div className="nt__day"><b>{label}</b></div>
-              {(items as Array<{ n: typeof allNotes[0]["n"]; topicTitle: string | null; topicSlug: string | null; questionTitle: string | null; questionSlug: string | null }>).map(({ n, topicTitle, topicSlug, questionTitle, questionSlug }) => {
+              {(items as Array<{ n: typeof allNotes[0]["n"]; topicTitle: string | null; topicSlug: string | null; topicTrack: string | null; questionTitle: string | null; questionSlug: string | null; questionTrack: string | null }>).map(({ n, topicTitle, topicSlug, topicTrack, questionTitle, questionSlug, questionTrack }) => {
                 const wordCount = n.body ? n.body.split(/\s+/).filter(Boolean).length : 0;
                 return (
                   <div key={n.id} className="nrow">
                     <div className="nrow__when">{relativeTime(n.updatedAt)}</div>
                     <div>
                       {topicTitle && topicSlug && (
-                        <Link href={`/topics/${topicSlug}`} className="nrow__parent">
+                        <Link href={`/${topicTrack ?? "system-design"}/topics/${topicSlug}`} className="nrow__parent">
                           ↳ Topic · {topicTitle}
                         </Link>
                       )}
                       {questionTitle && questionSlug && (
-                        <Link href={`/questions/${questionSlug}`} className="nrow__parent">
+                        <Link href={`/${questionTrack ?? "system-design"}/questions/${questionSlug}`} className="nrow__parent">
                           ↳ Question · {questionTitle}
                         </Link>
                       )}

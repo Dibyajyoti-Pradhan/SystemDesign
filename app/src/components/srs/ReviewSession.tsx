@@ -82,8 +82,14 @@ export function ReviewSession({
 
   const total = cards.length;
   const current = cards[index];
-  const progress = total === 0 ? 100 : Math.round((index / total) * 100);
+  const progress = done ? 100 : total === 0 ? 100 : Math.round((index / total) * 100);
   const finished = useMemo(() => stats.again + stats.hard + stats.good + stats.easy, [stats]);
+
+  // Push progress into the server-rendered bar in the parent page
+  useEffect(() => {
+    const bar = document.querySelector<HTMLElement>(".srs-bar > i");
+    if (bar) bar.style.width = `${progress}%`;
+  }, [progress]);
 
   async function rate(rating: 1 | 2 | 3 | 4) {
     if (!current || submitting) return;

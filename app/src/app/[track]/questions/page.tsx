@@ -111,10 +111,15 @@ export default async function QuestionsPage({
           )}
 
           {empty ? (
-            <div style={{ padding: "48px 0", color: "var(--mute)", fontFamily: "var(--font-mono)", fontSize: 12, textAlign: "center" }}>
-              {lang
-                ? `No questions for "${lang}" yet.`
-                : `No questions seeded for ${TRACK_LABELS[track]} yet.`}
+            <div style={{ padding: "56px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <div style={{ fontFamily: "var(--font-read)", fontSize: 32, fontStyle: "italic", color: "var(--mute)", letterSpacing: "-0.02em" }}>
+                {lang ? `No ${lang} questions yet.` : "Coming soon."}
+              </div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--mute-2)", textAlign: "center", maxWidth: "42ch" }}>
+                {lang
+                  ? `No questions are available for ${lang} yet. Try a different language or check back later.`
+                  : `${TRACK_LABELS[track]} interview questions are being added. Switch to the System Design track to get started now.`}
+              </div>
             </div>
           ) : (
             <div>

@@ -117,6 +117,41 @@ async function seedTopics(track: Track): Promise<number> {
   return count;
 }
 
+// Per-question metadata keyed by question number
+const SD_QUESTION_META: Record<number, { difficulty: "easy" | "medium" | "hard"; tags: string[]; estMinutes: number }> = {
+  1:  { difficulty: "medium", tags: ["trie", "caching", "ranking"],          estMinutes: 35 },
+  2:  { difficulty: "easy",   tags: ["hashing", "caching", "sharding"],      estMinutes: 25 },
+  3:  { difficulty: "hard",   tags: ["feed", "cdn", "sharding"],             estMinutes: 45 },
+  4:  { difficulty: "hard",   tags: ["cdn", "streaming", "storage"],         estMinutes: 50 },
+  5:  { difficulty: "hard",   tags: ["streaming", "cdn", "drm"],             estMinutes: 50 },
+  6:  { difficulty: "hard",   tags: ["blob-storage", "sync", "conflict"],    estMinutes: 50 },
+  7:  { difficulty: "hard",   tags: ["catalog", "cart", "payments"],         estMinutes: 50 },
+  8:  { difficulty: "hard",   tags: ["payments", "idempotency", "ledger"],   estMinutes: 45 },
+  9:  { difficulty: "hard",   tags: ["crdt", "websockets", "ot"],            estMinutes: 50 },
+  10: { difficulty: "easy",   tags: ["storage", "ttl", "hashing"],           estMinutes: 25 },
+  11: { difficulty: "medium", tags: ["crawling", "queues", "deduplication"], estMinutes: 40 },
+  12: { difficulty: "medium", tags: ["caching", "eviction", "sharding"],     estMinutes: 35 },
+  13: { difficulty: "medium", tags: ["queues", "pub-sub", "backpressure"],   estMinutes: 40 },
+  14: { difficulty: "medium", tags: ["rate-limiting", "token-bucket"],       estMinutes: 30 },
+  15: { difficulty: "hard",   tags: ["inverted-index", "ranking", "crawl"],  estMinutes: 50 },
+  16: { difficulty: "hard",   tags: ["websockets", "e2e-encryption", "fan-out"], estMinutes: 45 },
+  17: { difficulty: "hard",   tags: ["pub-sub", "presence", "channels"],     estMinutes: 45 },
+  18: { difficulty: "hard",   tags: ["feed", "ranking", "fan-out"],          estMinutes: 50 },
+  19: { difficulty: "hard",   tags: ["geospatial", "matching", "maps"],      estMinutes: 50 },
+  20: { difficulty: "hard",   tags: ["geospatial", "matching", "delivery"],  estMinutes: 50 },
+  21: { difficulty: "medium", tags: ["booking", "locks", "payments"],        estMinutes: 35 },
+  22: { difficulty: "medium", tags: ["scheduling", "reminders", "sync"],     estMinutes: 40 },
+  23: { difficulty: "hard",   tags: ["email", "search", "labels"],           estMinutes: 50 },
+  24: { difficulty: "hard",   tags: ["webrtc", "signaling", "sfu"],          estMinutes: 50 },
+  25: { difficulty: "hard",   tags: ["ml-inference", "object-detection"],    estMinutes: 45 },
+  26: { difficulty: "medium", tags: ["websockets", "time-series", "fan-out"],estMinutes: 35 },
+  27: { difficulty: "hard",   tags: ["ml", "feature-store", "streaming"],    estMinutes: 50 },
+  28: { difficulty: "hard",   tags: ["ml", "nlp", "classification"],         estMinutes: 50 },
+  29: { difficulty: "medium", tags: ["time-series", "sensors", "alerts"],    estMinutes: 35 },
+  30: { difficulty: "hard",   tags: ["llm", "inference", "streaming"],       estMinutes: 50 },
+  31: { difficulty: "medium", tags: ["search", "scheduling", "emr"],         estMinutes: 40 },
+};
+
 async function seedQuestions(track: Track): Promise<number> {
   if (track === "coding") return 0; // coding questions need language JSON; skip for local dev
 
@@ -130,6 +165,7 @@ async function seedQuestions(track: Track): Promise<number> {
     if (!q) continue;
     const slug = slugify(`${String(q.number).padStart(2, "0")}-${q.title}`);
     const mdxSlug = slug.replace(/^0+/, "");
+    const meta = SD_QUESTION_META[q.number] ?? { difficulty: "medium" as const, tags: [], estMinutes: 40 };
     try {
       const res = db
         .insert(questions)
@@ -139,8 +175,9 @@ async function seedQuestions(track: Track): Promise<number> {
           slug,
           number: q.number,
           title: q.title,
-          difficulty: "medium",
-          tags: "[]",
+          difficulty: meta.difficulty,
+          tags: JSON.stringify(meta.tags),
+          estMinutes: meta.estMinutes,
           pdfPath: path.relative(REPO_ROOT, path.join(root, file)),
           mdxPath: findQuestionMdx(slug) ?? findQuestionMdx(mdxSlug),
         })

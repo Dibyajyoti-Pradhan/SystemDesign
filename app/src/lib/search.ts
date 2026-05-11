@@ -8,6 +8,7 @@ export type SearchHit = {
   slug: string;
   title: string;
   category?: string;
+  track: string;
   score: number;
 };
 
@@ -18,8 +19,8 @@ async function buildIndex() {
   const allTopics = await db.select().from(topics);
   const allQuestions = await db.select().from(questions);
   const docs = [
-    ...allTopics.map((t) => ({ kind: "topic" as const, id: t.id, slug: t.slug, title: t.title, category: t.category, summary: t.summary })),
-    ...allQuestions.map((q) => ({ kind: "question" as const, id: q.id, slug: q.slug, title: q.title, category: "Design Question", summary: "" })),
+    ...allTopics.map((t) => ({ kind: "topic" as const, id: t.id, slug: t.slug, title: t.title, category: t.category, summary: t.summary, track: t.track })),
+    ...allQuestions.map((q) => ({ kind: "question" as const, id: q.id, slug: q.slug, title: q.title, category: "Design Question", summary: "", track: q.track })),
   ];
   const fuse = new Fuse(docs, {
     keys: [{ name: "title", weight: 2 }, { name: "category", weight: 1 }, { name: "summary", weight: 0.5 }],
@@ -43,6 +44,7 @@ export async function search(query: string, limit = 20): Promise<SearchHit[]> {
     slug: r.item.slug,
     title: r.item.title,
     category: r.item.category,
+    track: r.item.track,
     score: r.score ?? 1,
   }));
 }

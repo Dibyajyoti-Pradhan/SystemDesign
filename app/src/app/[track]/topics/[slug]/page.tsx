@@ -154,7 +154,7 @@ export default async function TopicPage({
             <div className="td__meta">
               <span className="badge">{topic.category}</span>
               {cardsForTopic.n > 0 && (
-                <span className="badge badge--accent">{cardsForTopic.n} cards</span>
+                <span className="badge badge--accent">{cardsForTopic.n} {cardsForTopic.n === 1 ? "card" : "cards"}</span>
               )}
               {!parsed && <span className="badge">PDF only</span>}
               {topic.lastVisitedAt && (
@@ -249,13 +249,28 @@ export default async function TopicPage({
           </div>
         </div>
 
-        {/* On this page (static TOC placeholder) */}
-        <div className="rail__group rail__toc">
-          <div className="rail__h">On this page</div>
-          <span className="rail__toc-item" style={{ color: "var(--mute-2)", fontSize: "11px", fontFamily: "var(--font-mono)" }}>
-            TL;DR · Standard · Deep
-          </span>
-        </div>
+        {/* Depth navigation */}
+        {parsed && (
+          <div className="rail__group rail__toc">
+            <div className="rail__h">Read at depth</div>
+            {[
+              { id: "tldr", label: "TL;DR", hint: "1 min" },
+              { id: "standard", label: "Standard", hint: "5 min" },
+              { id: "deep", label: "Deep dive", hint: "15 min" },
+              ...(topic.pdfPath ? [{ id: "source", label: "Source PDF", hint: "pdf" }] : []),
+            ].map((tab) => (
+              <Link
+                key={tab.id}
+                href={`/${track}/topics/${topic.slug}?depth=${tab.id}`}
+                className="rail__toc-item"
+                style={depth === tab.id || (!depth && tab.id === "standard") ? { color: "var(--accent)" } : {}}
+              >
+                {tab.label}
+                <span style={{ marginLeft: 6, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)" }}>{tab.hint}</span>
+              </Link>
+            ))}
+          </div>
+        )}
 
         {/* Related topics */}
         {relatedTopics.length > 0 && (

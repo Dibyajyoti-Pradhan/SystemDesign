@@ -67,7 +67,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 <em>{topics.length}</em>
               </div>
               {topics.map((h) => (
-                <Link key={`topic-${h.id}`} href={`/topics/${h.slug}`} className="res">
+                <Link key={`topic-${h.id}`} href={`/${h.track}/topics/${h.slug}`} className="res">
                   <span className="res__kind">Topic</span>
                   <span>
                     <span className="res__t">{h.title}</span>
@@ -86,7 +86,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
                 <em>{questions.length}</em>
               </div>
               {questions.map((h) => (
-                <Link key={`question-${h.id}`} href={`/questions/${h.slug}`} className="res">
+                <Link key={`question-${h.id}`} href={`/${h.track}/questions/${h.slug}`} className="res">
                   <span className="res__kind">Question</span>
                   <span>
                     <span className="res__t">{h.title}</span>
@@ -98,20 +98,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             </div>
           )}
 
-          <div className="sr__hint">
-            <span>
-              <kbd style={{padding:"2px 6px", background:"var(--surf-2)", borderRadius:4, border:"1px solid var(--line-2)"}}>↵</kbd>
-              open
-            </span>
-            <span>
-              <kbd style={{padding:"2px 6px", background:"var(--surf-2)", borderRadius:4, border:"1px solid var(--line-2)"}}>↑↓</kbd>
-              navigate
-            </span>
-            <span>
-              <kbd style={{padding:"2px 6px", background:"var(--surf-2)", borderRadius:4, border:"1px solid var(--line-2)"}}>esc</kbd>
-              clear
-            </span>
-          </div>
         </div>
       </div>
     </>
