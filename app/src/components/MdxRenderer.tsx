@@ -1,4 +1,4 @@
-import { MDXRemote } from "next-mdx-remote/rsc";
+import { compileMDX } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import { Mermaid } from "./Mermaid";
 
@@ -16,14 +16,21 @@ const components = {
 };
 
 export async function MdxRenderer({ source }: { source: string }) {
-  return (
-    <MDXRemote
-      source={source}
-      components={components as any}
-      options={{
+  try {
+    const { content } = await compileMDX({
+      source,
+      components: components as any,
+      options: {
         parseFrontmatter: false,
         mdxOptions: { remarkPlugins: [remarkGfm] },
-      }}
-    />
-  );
+      },
+    });
+    return content;
+  } catch {
+    return (
+      <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.6 }}>
+        {source}
+      </pre>
+    );
+  }
 }

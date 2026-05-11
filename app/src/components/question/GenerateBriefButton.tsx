@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2 } from "lucide-react";
 
 export function GenerateBriefButton({ slug }: { slug: string }) {
   const router = useRouter();
@@ -33,24 +31,28 @@ export function GenerateBriefButton({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="space-y-2">
-      <Button onClick={trigger} disabled={pending} variant="outline" size="sm">
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <button onClick={trigger} disabled={pending} className="btn btn--ghost" style={{ fontSize: 12, padding: "4px 10px", display: "inline-flex", alignItems: "center", gap: 6 }}>
         {pending ? (
           <>
-            <Loader2 className="h-4 w-4 animate-spin" /> Generating brief… ({eta}s)
+            <svg style={{ width: 12, height: 12, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+            Generating… ({eta}s)
           </>
         ) : (
           <>
-            <Sparkles className="h-4 w-4" /> Generate brief
+            <svg style={{ width: 12, height: 12 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            Generate brief
           </>
         )}
-      </Button>
-      {pending && (
-        <p className="text-xs text-muted-foreground">
-          Claude is reading the PDF and extracting just the question — never the solution. ~20-40s.
-        </p>
+      </button>
+      {error && (
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--bad)" }}>{error}</span>
       )}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

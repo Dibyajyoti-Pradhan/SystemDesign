@@ -111,6 +111,8 @@ Produce the MDX brief now. Remember: question only, never the solution.`,
   const cleaned = mdx
     .replace(/^```(?:mdx|md)?\n?/, "")
     .replace(/\n?```\s*$/, "")
+    // Angle-bracket autolinks break MDX JSX parsing (e.g. <https://foo.com/#anchor>)
+    .replace(/<(https?:\/\/[^\s>]+)>/g, "$1")
     .trim();
 
   if (!cleaned) {
