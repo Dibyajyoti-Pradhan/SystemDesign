@@ -1,4 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
+import * as cli from "./claude-cli";
+
+// When ANTHROPIC_API_KEY is absent (local dev), delegate to the claude CLI
+// so devs can use their Pro/Max subscription without a separate API key.
+// In production, ANTHROPIC_API_KEY must be set and the SDK path is always used.
+const useCli = () => !process.env.ANTHROPIC_API_KEY;
 
 export class ClaudeCliError extends Error {
   constructor(message: string, public stderr?: string, public exitCode?: number | null) {
@@ -46,6 +52,7 @@ function getClient(): Anthropic {
 }
 
 export async function claudeRun(opts: ClaudeRunOptions): Promise<string> {
+  if (useCli()) return cli.claudeRun(opts);
   const client = getClient();
   const model = resolveModel(opts.model);
 
@@ -90,6 +97,7 @@ export async function claudeRun(opts: ClaudeRunOptions): Promise<string> {
 }
 
 export async function* claudeStream(opts: ClaudeRunOptions): AsyncGenerator<string, void, unknown> {
+  if (useCli()) { yield* cli.claudeStream(opts); return; }
   const client = getClient();
   const model = resolveModel(opts.model);
 
