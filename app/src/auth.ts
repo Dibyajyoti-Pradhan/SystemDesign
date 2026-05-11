@@ -3,6 +3,7 @@ import Google from 'next-auth/providers/google'
 import { db } from '@/db/client'
 import { users, FREE_FOREVER_EMAIL } from '@/db/schema'
 import { eq } from 'drizzle-orm'
+import logger from '@/lib/logger'
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -30,8 +31,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             trialEndsAt: isForeverFree ? null : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           }).returning({ id: users.id })
           token.sub = newUser[0]?.id
+          logger.info({ email: user.email, userId: newUser[0]?.id, plan: isForeverFree ? 'free' : 'trial' }, 'new user created')
         } else {
           token.sub = existing[0]?.id
+          logger.info({ email: user.email, userId: existing[0]?.id }, 'existing user signed in')
         }
       }
       return token

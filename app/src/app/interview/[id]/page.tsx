@@ -292,10 +292,10 @@ export default function InterviewSessionPage({ params }: PageProps) {
       </header>
 
       {/* Main two-column area */}
-      <div className="flex flex-1 min-h-0">
-        {/* Whiteboard — 60% */}
-        <div className="w-3/5 flex flex-col min-h-0 border-r">
-          <div className="flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row flex-1 min-h-0">
+        {/* Whiteboard — full width on mobile, 60% on md+ */}
+        <div className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r">
+          <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
             <Whiteboard onChange={handleWhiteboardChange} />
           </div>
 
@@ -348,8 +348,8 @@ export default function InterviewSessionPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Transcript sidebar — 40% */}
-        <div className="w-2/5 min-h-0 flex flex-col">
+        {/* Transcript sidebar — full width on mobile, 40% on md+ */}
+        <div className="w-full md:w-2/5 min-h-0 flex flex-col">
           <TranscriptSidebar
             messages={messages}
             score={score}

@@ -24,8 +24,8 @@ export default async function AdminDashboardPage() {
         <p className="text-muted-foreground mt-1">{rows.length} topics in the database</p>
       </header>
 
-      <div className="rounded-md border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-md border overflow-x-auto">
+        <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-muted/50">
             <tr>
               <th className="text-left px-4 py-3 font-medium">Topic</th>

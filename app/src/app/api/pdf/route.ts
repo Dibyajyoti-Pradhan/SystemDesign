@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { REPO_ROOT } from "@/lib/paths";
 import { apiAuthGuard } from "@/lib/auth-guards";
+import logger from "@/lib/logger";
 
 const CONTENT_TYPE_BY_EXT: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -28,6 +29,13 @@ export async function GET(req: NextRequest) {
   const data = fs.readFileSync(abs);
   const ext = path.extname(abs).toLowerCase();
   const contentType = CONTENT_TYPE_BY_EXT[ext] ?? "application/octet-stream";
+
+  logger.info({
+    route: "pdf",
+    userId: guard.userId,
+    filename: path.basename(abs),
+    filesize: data.length,
+  }, "pdf served");
   // .docx is not viewable inline — force download. PDFs and text inline.
   const disposition = ext === ".docx" || ext === ".doc" ? "attachment" : "inline";
 

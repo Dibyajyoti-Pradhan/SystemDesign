@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import path from "node:path";
 import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
+import { requireUser } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { claudeStream, formatTranscriptAsPrompt } from "@/lib/anthropic";
 import { buildInterviewerSystemPrompt } from "@/lib/interviewer";
@@ -33,6 +34,12 @@ function clipReference(text: string, max = 24_000): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireUser();
+  } catch {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   let body: { sessionId?: number; content?: string; autoBegin?: boolean } = {};
   try {
     body = await req.json();

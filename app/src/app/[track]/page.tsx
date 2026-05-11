@@ -157,7 +157,7 @@ export default async function TrackHome({
           <CardContent>
             {recentSessions.length === 0 ? (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">No sessions yet.</p>
+                <p className="text-sm text-muted-foreground">No sessions yet — start your first interview.</p>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/${track}/questions`}>
                     <BookOpen className="h-4 w-4" /> Start one

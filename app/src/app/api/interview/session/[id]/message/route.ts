@@ -4,6 +4,7 @@ import path from "node:path";
 import { apiAuthGuard } from "@/lib/auth-guards";
 import { NextResponse } from "next/server";
 import { claudeStream } from "@/lib/anthropic";
+import logger from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +64,15 @@ export async function POST(
   if (!message?.trim()) {
     return new Response("Empty message", { status: 400 });
   }
+
+  logger.info({
+    route: "interview/session/message",
+    userId: guard.userId,
+    sessionId: id,
+    messageLength: message.length,
+    companyStyle: companyStyle ?? "generic",
+    hintLevel,
+  }, "interview message received");
 
   // Build system prompt
   let systemText = loadSystemPrompt();

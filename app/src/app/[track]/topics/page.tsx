@@ -80,7 +80,7 @@ export default async function TopicsPage({
       {grouped.size === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            No topics yet. Run <code className="bg-muted px-1.5 py-0.5 rounded text-sm">npm run seed</code>.
+            No topics yet — upload a PDF to get started.
           </CardContent>
         </Card>
       )}

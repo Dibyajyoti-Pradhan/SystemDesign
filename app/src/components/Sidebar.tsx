@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Library, BookOpen, Sparkles, Layers } from "lucide-react";
+import { SignOutButton } from "@/components/SignOutButton";
 import { TRACKS, TRACK_LABELS, type Track } from "@/lib/tracks";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +70,10 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="mt-auto p-4 border-t">
+        <SignOutButton />
+      </div>
     </aside>
   );
 }

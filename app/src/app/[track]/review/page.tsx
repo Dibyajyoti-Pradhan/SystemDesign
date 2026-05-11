@@ -88,7 +88,7 @@ export default async function ReviewPage({
         <h1 className="text-3xl font-bold tracking-tight">Review</h1>
         <p className="text-muted-foreground mt-1">
           {queue.length === 0
-            ? "Inbox zero. Nothing left to drill."
+            ? "No cards due — come back tomorrow or add more topics."
             : `${queue.length} ${queue.length === 1 ? "card" : "cards"} due now${
                 topicTitle ? ` in ${topicTitle}` : ""
               }.`}
