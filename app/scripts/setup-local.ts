@@ -88,14 +88,15 @@ if (needsPush) {
 }
 
 // ── 3. Seed ──────────────────────────────────────────────────────────────────
+const MIN_TOPICS = 10; // bump seed-local.ts SEED_VERSION when you add more
 try {
   const Database = require("better-sqlite3");
   const db = new Database(dbPath);
   const rows = db.prepare("SELECT COUNT(*) as n FROM topics").get() as { n: number };
   db.close();
 
-  if (rows.n === 0) {
-    log("DB is empty — seeding local data...");
+  if (rows.n < MIN_TOPICS) {
+    log(`DB has ${rows.n} topics (need ${MIN_TOPICS}) — reseeding...`);
     execSync("npx tsx scripts/seed-local.ts", {
       cwd: ROOT,
       stdio: "inherit",
