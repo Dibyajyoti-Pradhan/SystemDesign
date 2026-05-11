@@ -47,6 +47,16 @@ const CSS = `
 .rail__toc-item { display:block; font-size: 12px; color: var(--mute); padding: 4px 0; text-decoration: none; border-bottom: 1px solid transparent; }
 .rail__toc-item:hover { color: var(--ink); }
 .depth-wrap { padding-top: 4px; }
+.ruler { margin: 24px 0 28px; }
+.ruler__row { display:grid; grid-template-columns: repeat(3, 1fr); position: relative; padding: 10px 0 22px; }
+.ruler__row::before { content:""; position:absolute; left:0; right:0; bottom: 14px; height:1px; background: var(--line); }
+.ruler__tick { display:flex; flex-direction: column; gap:4px; cursor:pointer; padding-right: 18px; position: relative; padding-bottom: 18px; }
+.ruler__k { font-size: 14.5px; font-weight: 500; color: var(--mute); letter-spacing: -0.005em; }
+.ruler__t { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute-2); text-transform: uppercase; letter-spacing: .1em; }
+.ruler__tick.is-on .ruler__k { color: var(--ink); }
+.ruler__tick.is-on .ruler__t { color: var(--accent); }
+.ruler__tick::after { content:""; position:absolute; left:0; bottom: 11px; width: 7px; height: 7px; background: var(--surf-3); border-radius: 999px; box-shadow: 0 0 0 3px var(--bg); }
+.ruler__tick.is-on::after { background: var(--accent); box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px rgba(212,165,116,0.15); }
 `;
 
 /**
@@ -99,8 +109,15 @@ function SourceCard({ pdfPath, title }: { pdfPath: string; title: string }) {
   );
 }
 
-export default async function TopicPage({ params }: { params: Promise<{ track: string; slug: string }> }) {
+export default async function TopicPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ track: string; slug: string }>;
+  searchParams: Promise<{ depth?: string }>;
+}) {
   const { track: trackParam, slug } = await params;
+  const { depth } = await searchParams;
   const track = parseTrack(trackParam);
   if (!track) notFound();
   const [topic] = await db
@@ -173,6 +190,26 @@ export default async function TopicPage({ params }: { params: Promise<{ track: s
                 </div>
               </div>
               <span className="pct">{topic.mastery}%</span>
+            </div>
+          </div>
+
+          {/* Depth ruler */}
+          <div className="ruler">
+            <div className="ruler__row">
+              {[
+                { id: 'tldr', k: 'TL;DR', t: '1 min' },
+                { id: 'standard', k: 'Standard', t: '5 min' },
+                { id: 'deep', k: 'Deep', t: '15 min' },
+              ].map((tab) => (
+                <Link
+                  key={tab.id}
+                  href={`/${track}/topics/${topic.slug}?depth=${tab.id}`}
+                  className={`ruler__tick${(depth === tab.id || (!depth && tab.id === 'standard')) ? ' is-on' : ''}`}
+                >
+                  <div className="ruler__k">{tab.k}</div>
+                  <div className="ruler__t">{tab.t}</div>
+                </Link>
+              ))}
             </div>
           </div>
 

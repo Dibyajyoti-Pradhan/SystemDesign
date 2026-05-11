@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, boolean, timestamp, index } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { TRACKS } from "@/lib/tracks";
 
@@ -9,19 +9,22 @@ export { TRACKS } from "@/lib/tracks";
 const FREE_FOREVER_EMAIL = "dibyojyotipradhan@gmail.com";
 export { FREE_FOREVER_EMAIL };
 
-export const users = pgTable("users", {
+// Helper: SQLite timestamp stored as integer milliseconds, maps to/from Date
+const ts = (name: string) => integer(name, { mode: "timestamp_ms" });
+
+export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name"),
   image: text("image"),
   // If email === FREE_FOREVER_EMAIL, plan is always 'free' and never expires (enforced in app layer)
   plan: text("plan", { enum: ["free", "trial", "paid"] }).notNull().default("trial"),
-  trialEndsAt: timestamp("trial_ends_at"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  trialEndsAt: ts("trial_ends_at"),
+  createdAt: ts("created_at").notNull().default(sql`(unixepoch('now') * 1000)`),
 });
 
-export const topics = pgTable("topics", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+export const topics = sqliteTable("topics", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   track: text("track", { enum: TRACKS }).notNull().default("system-design"),
   language: text("language"),
@@ -34,19 +37,19 @@ export const topics = pgTable("topics", {
   mdxPath: text("mdx_path"),
   pdfPath: text("pdf_path"),
   mastery: integer("mastery").notNull().default(0),
-  lastVisitedAt: timestamp("last_visited_at"),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
-  generatedAt: timestamp("generated_at"),
+  lastVisitedAt: ts("last_visited_at"),
+  createdAt: ts("created_at").notNull().default(sql`(unixepoch('now') * 1000)`),
+  generatedAt: ts("generated_at"),
   version: integer("version").notNull().default(0),
   generationStatus: text("generation_status", { enum: ["pending", "done", "error"] }).notNull().default("pending"),
 }, (t) => ({
   userIdx: index("topics_user_idx").on(t.userId),
 }));
 
-export const topicLinks = pgTable(
+export const topicLinks = sqliteTable(
   "topic_links",
   {
-    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     fromTopicId: integer("from_topic_id").notNull().references(() => topics.id),
     toTopicId: integer("to_topic_id").notNull().references(() => topics.id),
     relation: text("relation").notNull().default("related"),
@@ -57,8 +60,8 @@ export const topicLinks = pgTable(
   }),
 );
 
-export const questions = pgTable("questions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+export const questions = sqliteTable("questions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   track: text("track", { enum: TRACKS }).notNull().default("system-design"),
   language: text("language"),
@@ -70,15 +73,15 @@ export const questions = pgTable("questions", {
   pdfPath: text("pdf_path"),
   mdxPath: text("mdx_path"),
   estMinutes: integer("est_minutes").notNull().default(45),
-  createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  createdAt: ts("created_at").notNull().default(sql`(unixepoch('now') * 1000)`),
 }, (t) => ({
   userIdx: index("questions_user_idx").on(t.userId),
 }));
 
-export const cards = pgTable(
+export const cards = sqliteTable(
   "cards",
   {
-    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     topicId: integer("topic_id").references(() => topics.id),
     questionId: integer("question_id").references(() => questions.id),
@@ -91,10 +94,10 @@ export const cards = pgTable(
     intervalDays: real("interval_days").notNull().default(0),
     repetitions: integer("repetitions").notNull().default(0),
     lapses: integer("lapses").notNull().default(0),
-    dueAt: timestamp("due_at"),
-    lastReviewedAt: timestamp("last_reviewed_at"),
+    dueAt: ts("due_at"),
+    lastReviewedAt: ts("last_reviewed_at"),
     generatedByModel: text("generated_by_model"),
-    createdAt: timestamp("created_at").notNull().default(sql`now()`),
+    createdAt: ts("created_at").notNull().default(sql`(unixepoch('now') * 1000)`),
     difficulty: integer("difficulty").notNull().default(3),
     lastScore: integer("last_score"),
   },
@@ -105,16 +108,16 @@ export const cards = pgTable(
   }),
 );
 
-export const reviews = pgTable(
+export const reviews = sqliteTable(
   "reviews",
   {
-    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     cardId: integer("card_id").notNull().references(() => cards.id),
     rating: integer("rating").notNull(),
     prevInterval: real("prev_interval").notNull(),
     nextInterval: real("next_interval").notNull(),
-    reviewedAt: timestamp("reviewed_at").notNull().default(sql`now()`),
+    reviewedAt: ts("reviewed_at").notNull().default(sql`(unixepoch('now') * 1000)`),
   },
   (t) => ({
     cardIdx: index("reviews_card_idx").on(t.cardId),
@@ -122,13 +125,13 @@ export const reviews = pgTable(
   }),
 );
 
-export const interviewSessions = pgTable("interview_sessions", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+export const interviewSessions = sqliteTable("interview_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   questionId: integer("question_id").notNull().references(() => questions.id),
   mode: text("mode", { enum: ["self", "ai_vs_ai"] }).notNull().default("self"),
-  startedAt: timestamp("started_at").notNull().default(sql`now()`),
-  endedAt: timestamp("ended_at"),
+  startedAt: ts("started_at").notNull().default(sql`(unixepoch('now') * 1000)`),
+  endedAt: ts("ended_at"),
   transcript: text("transcript").notNull().default("[]"),
   rubric: text("rubric"),
   score: integer("score"),
@@ -136,16 +139,16 @@ export const interviewSessions = pgTable("interview_sessions", {
   userIdx: index("interview_sessions_user_idx").on(t.userId),
 }));
 
-export const notes = pgTable(
+export const notes = sqliteTable(
   "notes",
   {
-    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    id: integer("id").primaryKey({ autoIncrement: true }),
     userId: text("user_id").notNull(),
     topicId: integer("topic_id").references(() => topics.id),
     questionId: integer("question_id").references(() => questions.id),
     body: text("body").notNull(),
-    createdAt: timestamp("created_at").notNull().default(sql`now()`),
-    updatedAt: timestamp("updated_at").notNull().default(sql`now()`),
+    createdAt: ts("created_at").notNull().default(sql`(unixepoch('now') * 1000)`),
+    updatedAt: ts("updated_at").notNull().default(sql`(unixepoch('now') * 1000)`),
   },
   (t) => ({
     topicIdx: index("notes_topic_idx").on(t.topicId),

@@ -23,17 +23,9 @@ if (!process.env.UPSTASH_REDIS_URL || !process.env.UPSTASH_REDIS_TOKEN) {
 }
 
 import { Worker, type Job } from "bullmq";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
 import { eq } from "drizzle-orm";
-import * as schema from "../src/db/schema";
+import { db, schema } from "../src/db/client";
 import type { ContentJobData } from "../src/lib/queue";
-
-// ---------------------------------------------------------------------------
-// DB
-// ---------------------------------------------------------------------------
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const db = drizzle(pool, { schema });
 
 // ---------------------------------------------------------------------------
 // Helpers shared with generate route (copy-free — replicate the same logic)

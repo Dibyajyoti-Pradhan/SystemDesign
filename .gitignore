@@ -29,3 +29,9 @@ app/*.tsbuildinfo
 **/C++ Playground/
 **/Java Playground/
 **/Python Playground/
+local.db
+
+# Local SQLite dev database
+app/local.db
+app/local.db-shm
+app/local.db-wal

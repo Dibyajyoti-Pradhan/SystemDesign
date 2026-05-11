@@ -1,9 +1,15 @@
-import pino from 'pino'
+import pino from "pino";
 
-const logger = pino(
-  process.env.NODE_ENV === 'development'
-    ? { transport: { target: 'pino-pretty' } }
-    : {},
-)
+const isDev = process.env.NODE_ENV !== "production";
 
-export default logger
+const logger = isDev
+  ? pino({ level: "info" }, pino.destination({ dest: process.stdout.fd, sync: true }))
+  : pino({
+      level: "info",
+      transport: {
+        target: "pino-pretty",
+        options: { colorize: true },
+      },
+    });
+
+export default logger;
