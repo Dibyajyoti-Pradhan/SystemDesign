@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="antialiased">
-        <div className="scr" style={{ minHeight: "100vh" }}>
+        <div className="scr" style={{ height: "100vh" }}>
           <Sidebar />
           <main className="main">{children}</main>
           <AssistantPanel />
