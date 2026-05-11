@@ -4,11 +4,19 @@ import { cards, reviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { schedule, type Rating } from "@/lib/srs";
 import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  let userId: string;
+  try {
+    userId = await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id: idStr } = await params;
   const id = Number(idStr);
   if (!Number.isFinite(id)) {
@@ -48,6 +56,13 @@ export async function POST(
     now,
   );
 
+  // rating 1 = Again (wrong), 2 = Hard (wrong), 3 = Good (correct), 4 = Easy (correct)
+  const isCorrect = rating >= 3;
+  const lastScore = isCorrect ? 1 : 0;
+  const newDifficulty = isCorrect
+    ? Math.max(1, (card.difficulty ?? 3) - 1)
+    : Math.min(5, (card.difficulty ?? 3) + 1);
+
   await db
     .update(cards)
     .set({
@@ -57,11 +72,13 @@ export async function POST(
       lapses: next.lapses,
       dueAt: next.dueAt,
       lastReviewedAt: now,
+      difficulty: newDifficulty,
+      lastScore,
     })
     .where(eq(cards.id, id));
 
   await db.insert(reviews).values({
-    userId: "system", // TODO: replace with real user id when auth is wired
+    userId,
     cardId: id,
     rating,
     prevInterval,

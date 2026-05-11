@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import fsSync from "node:fs";
+import path from "node:path";
 import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
+import { requireUser } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { claudeRun } from "@/lib/anthropic";
 import { buildGradingPrompt } from "@/lib/interviewer";
@@ -70,6 +73,19 @@ const RUBRIC_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+function loadPrompt(name: string, fallback: string): string {
+  try {
+    return fsSync.readFileSync(path.join(process.cwd(), "../prompts", name), "utf8");
+  } catch {
+    return fallback;
+  }
+}
+
+const GRADE_SYSTEM_PROMPT = loadPrompt(
+  "interview-grade.txt",
+  "You are a strict, fair grader of system-design mock interviews. Output ONLY a JSON object exactly matching the provided schema. No markdown fences. No commentary.",
+);
+
 function clamp(n: unknown): number {
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return 0;
@@ -95,6 +111,12 @@ function normalizeRubric(parsed: unknown): Rubric | null {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: { sessionId?: number } = {};
   try {
     body = await req.json();
@@ -129,8 +151,7 @@ export async function POST(req: NextRequest) {
   let rawText = "";
   try {
     rawText = await claudeRun({
-      systemPrompt:
-        "You are a strict, fair grader of system-design mock interviews. Output ONLY a JSON object exactly matching the provided schema. No markdown fences. No commentary.",
+      systemPrompt: GRADE_SYSTEM_PROMPT,
       prompt,
       jsonSchema: RUBRIC_SCHEMA,
       model: "sonnet",

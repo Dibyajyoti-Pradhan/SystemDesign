@@ -36,6 +36,9 @@ export const topics = pgTable("topics", {
   mastery: integer("mastery").notNull().default(0),
   lastVisitedAt: timestamp("last_visited_at"),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
+  generatedAt: timestamp("generated_at"),
+  version: integer("version").notNull().default(0),
+  generationStatus: text("generation_status", { enum: ["pending", "done", "error"] }).notNull().default("pending"),
 }, (t) => ({
   userIdx: index("topics_user_idx").on(t.userId),
 }));
@@ -92,6 +95,8 @@ export const cards = pgTable(
     lastReviewedAt: timestamp("last_reviewed_at"),
     generatedByModel: text("generated_by_model"),
     createdAt: timestamp("created_at").notNull().default(sql`now()`),
+    difficulty: integer("difficulty").notNull().default(3),
+    lastScore: integer("last_score"),
   },
   (t) => ({
     statusDueIdx: index("cards_status_due_idx").on(t.status, t.dueAt),

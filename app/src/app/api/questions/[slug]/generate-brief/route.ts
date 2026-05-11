@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { db } from "@/db/client";
 import { questions } from "@/db/schema";
+import { requireUser } from "@/lib/auth";
 import { eq } from "drizzle-orm";
 import { claudeRun } from "@/lib/anthropic";
 import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "@/lib/paths";
@@ -12,7 +14,15 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 180;
 
-const SYSTEM_PROMPT = `You are summarizing a system-design interview question for a candidate who is about to attempt it.
+function loadPrompt(name: string, fallback: string): string {
+  try {
+    return fsSync.readFileSync(path.join(process.cwd(), "../prompts", name), "utf8");
+  } catch {
+    return fallback;
+  }
+}
+
+const SYSTEM_PROMPT_FALLBACK = `You are summarizing a system-design interview question for a candidate who is about to attempt it.
 
 Output an MDX document with:
 - Problem statement (1-2 sentences)
@@ -52,7 +62,15 @@ Keep it tight, ~150 words. No prose padding. Use real numbers when present in th
 
 Output ONLY the MDX. No commentary before or after.`;
 
+const SYSTEM_PROMPT = loadPrompt("question-generate-brief.txt", SYSTEM_PROMPT_FALLBACK);
+
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  try {
+    await requireUser();
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { slug } = await ctx.params;
 
   const [q] = await db.select().from(questions).where(eq(questions.slug, slug)).limit(1);

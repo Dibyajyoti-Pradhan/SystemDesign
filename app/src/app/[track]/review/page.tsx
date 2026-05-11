@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
 import { cards, topics } from "@/db/schema";
-import { and, eq, lte, asc, isNull, or } from "drizzle-orm";
+import { and, eq, lte, asc, desc, isNull, or } from "drizzle-orm";
 import { ReviewSession, type ReviewCard } from "@/components/srs/ReviewSession";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft } from "lucide-react";
@@ -56,7 +56,7 @@ export default async function ReviewPage({
     .from(cards)
     .leftJoin(topics, eq(cards.topicId, topics.id))
     .where(whereClause)
-    .orderBy(asc(cards.dueAt));
+    .orderBy(desc(cards.difficulty), asc(cards.dueAt));
 
   const queue: ReviewCard[] = rows.map((r) => ({
     id: r.id,

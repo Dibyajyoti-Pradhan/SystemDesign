@@ -1,3 +1,6 @@
+# Proprietary prompts — not for version control
+prompts/
+
 # Claude Code agent worktree storage — ephemeral, not part of the repo
 .claude/
 
