@@ -4,9 +4,6 @@ import { cards, topics } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Pencil, X, ArrowLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +35,33 @@ async function editCard(formData: FormData) {
   redirect(`/admin/cards/${id}/edit`);
 }
 
+const TYPE_COLORS: Record<string, string> = {
+  definition: "var(--info)",
+  tradeoff: "var(--warn)",
+  scenario: "var(--good)",
+  comparison: "var(--accent)",
+};
+
+const AQ_CSS = `
+.aq { height:100%; overflow:auto; }
+.aq__inner { max-width: 1080px; margin: 0 auto; padding: 30px 32px 60px; }
+.aq__head { display:flex; align-items: end; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.aq__h { font-size: 26px; font-weight: 600; letter-spacing: -0.022em; }
+.aq__h em { font-family: var(--font-read); font-style: italic; font-weight: 400; color: var(--mute); }
+.aq__sub { color: var(--mute); font-size: 14px; margin-top: 6px; max-width: 60ch; }
+.aq__r { margin-left: auto; display:flex; gap: 8px; align-items: center; }
+.aq__bar { display:grid; grid-template-columns: 32px 80px 80px 1.4fr 1fr 200px; gap: 18px; padding: 12px 6px; border-bottom: 1px solid var(--line); margin-top: 14px; }
+.aq__bar span { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute-2); text-transform: uppercase; letter-spacing: .12em; }
+.ar { display:grid; grid-template-columns: 32px 80px 80px 1.4fr 1fr 200px; gap: 18px; padding: 16px 6px; border-bottom: 1px solid var(--line); align-items: start; }
+.ar:hover { background: var(--bg-2); }
+.ar__chk { width: 16px; height: 16px; border:1px solid var(--line-2); border-radius: 3px; margin-top: 2px; cursor: pointer; }
+.ar__id { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); }
+.ar__type { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .12em; padding-top:1px; }
+.ar__front { font-size: 13.5px; color: var(--ink); line-height: 1.5; padding-right: 16px; }
+.ar__back { font-size: 12.5px; color: var(--mute); line-height: 1.5; max-width: 50ch; }
+.ar__act { display:flex; gap: 5px; justify-content: flex-end; }
+`;
+
 export default async function AdminCardsPage() {
   const rows = await db
     .select({
@@ -65,108 +89,91 @@ export default async function AdminCardsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <Link
-          href="/topics"
-          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          <ArrowLeft className="h-4 w-4" /> Topics
-        </Link>
-        <Badge variant="muted">{rows.length} pending</Badge>
-      </div>
-
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">Pending cards</h1>
-        <p className="text-muted-foreground mt-1">
-          Review Claude-generated flashcards before they enter your daily rotation.
-        </p>
-      </header>
-
-      {rows.length === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground space-y-3">
-            <p>No cards waiting for review.</p>
-            <div className="bg-muted px-3 py-2 rounded font-mono text-xs inline-block">
-              npm run generate-cards &lt;topic-slug&gt;
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {[...grouped.entries()].map(([topicTitle, items]) => (
-        <section key={topicTitle} className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold tracking-tight">{topicTitle}</h2>
-            <Badge variant="outline" className="text-[10px]">
-              {items.length} {items.length === 1 ? "card" : "cards"}
-            </Badge>
+    <div className="aq">
+      <style>{AQ_CSS}</style>
+      <div className="aq__inner">
+        <div className="aq__head">
+          <div>
+            <h1 className="aq__h">
+              Pending cards <em>approval queue</em>
+            </h1>
+            <p className="aq__sub">
+              Review Claude-generated flashcards before they enter your daily rotation.
+            </p>
           </div>
+          <div className="aq__r">
+            <Link
+              href="/admin"
+              style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textDecoration: "none", textTransform: "uppercase", letterSpacing: ".08em" }}
+            >
+              <ArrowLeft size={13} /> Admin
+            </Link>
+            <span className="badge badge--accent">{rows.length} pending</span>
+          </div>
+        </div>
 
-          <div className="space-y-3">
-            {items.map((c) => (
-              <Card key={c.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <CardTitle className="text-sm font-medium leading-snug">
-                      {c.front}
-                    </CardTitle>
-                    <div className="flex gap-1.5 shrink-0">
-                      <Badge variant="outline" className="text-[10px] uppercase">
-                        {c.type}
-                      </Badge>
-                      {c.diagramMermaid && (
-                        <Badge variant="muted" className="text-[10px]">
-                          diagram
-                        </Badge>
-                      )}
+        {rows.length === 0 && (
+          <div style={{ padding: "48px 0", textAlign: "center", color: "var(--mute)" }}>
+            <p style={{ marginBottom: 12 }}>No cards waiting for review.</p>
+            <code style={{ fontFamily: "var(--font-mono)", fontSize: 12, background: "var(--surf)", border: "1px solid var(--line)", borderRadius: 6, padding: "6px 12px" }}>
+              npm run generate-cards &lt;topic-slug&gt;
+            </code>
+          </div>
+        )}
+
+        {rows.length > 0 && (
+          <>
+            <div className="aq__bar">
+              <span></span>
+              <span>ID</span>
+              <span>Type</span>
+              <span>Front</span>
+              <span>Back</span>
+              <span style={{ textAlign: "right" }}>Actions</span>
+            </div>
+
+            {[...grouped.entries()].map(([topicTitle, items]) => (
+              <div key={topicTitle}>
+                <div style={{ padding: "14px 6px 6px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textTransform: "uppercase", letterSpacing: ".1em", borderBottom: "1px solid var(--line)" }}>
+                  {topicTitle}
+                  <span style={{ marginLeft: 10, color: "var(--mute-2)" }}>— {items.length}</span>
+                </div>
+                {items.map((c) => (
+                  <div key={c.id} className="ar">
+                    <div><div className="ar__chk" /></div>
+                    <div className="ar__id">#{c.id}</div>
+                    <div className="ar__type" style={{ color: TYPE_COLORS[c.type] ?? "var(--mute)" }}>
+                      {c.type}
+                    </div>
+                    <div className="ar__front">{c.front}</div>
+                    <div className="ar__back">{c.back}</div>
+                    <div className="ar__act">
+                      <form action={approveCard}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <button type="submit" className="btn btn--primary" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+                          <CheckCircle2 size={12} /> Approve
+                        </button>
+                      </form>
+                      <form action={editCard}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <button type="submit" className="btn btn--ghost" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}>
+                          <Pencil size={12} /> Edit
+                        </button>
+                      </form>
+                      <form action={rejectCard}>
+                        <input type="hidden" name="id" value={c.id} />
+                        <button type="submit" className="btn btn--ghost" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--bad)" }}>
+                          <X size={12} /> Reject
+                        </button>
+                      </form>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-4">
-                    {c.back}
-                  </div>
-                  {c.diagramMermaid && (
-                    <details className="border rounded">
-                      <summary className="px-3 py-1.5 text-xs cursor-pointer text-muted-foreground hover:bg-accent">
-                        Mermaid source
-                      </summary>
-                      <pre className="text-[11px] bg-muted p-3 overflow-x-auto rounded-b">
-                        {c.diagramMermaid}
-                      </pre>
-                    </details>
-                  )}
-
-                  <div className="flex gap-2 pt-1">
-                    <form action={approveCard}>
-                      <input type="hidden" name="id" value={c.id} />
-                      <Button type="submit" size="sm">
-                        <CheckCircle2 className="h-4 w-4" /> Approve
-                      </Button>
-                    </form>
-                    <form action={editCard}>
-                      <input type="hidden" name="id" value={c.id} />
-                      <Button type="submit" size="sm" variant="outline">
-                        <Pencil className="h-4 w-4" /> Edit
-                      </Button>
-                    </form>
-                    <form action={rejectCard}>
-                      <input type="hidden" name="id" value={c.id} />
-                      <Button type="submit" size="sm" variant="ghost">
-                        <X className="h-4 w-4" /> Reject
-                      </Button>
-                    </form>
-                    <span className="ml-auto text-[11px] text-muted-foreground self-center">
-                      {c.generatedByModel ?? "manual"}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+                ))}
+              </div>
             ))}
-          </div>
-        </section>
-      ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }

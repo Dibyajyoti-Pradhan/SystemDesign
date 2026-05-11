@@ -4,8 +4,6 @@ import { db } from "@/db/client";
 import { cards, topics } from "@/db/schema";
 import { and, eq, lte, asc, desc, isNull, or } from "drizzle-orm";
 import { ReviewSession, type ReviewCard } from "@/components/srs/ReviewSession";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 
 export const dynamic = "force-dynamic";
@@ -68,34 +66,61 @@ export default async function ReviewPage({
     topicSlug: r.topicSlug,
   }));
 
+  if (queue.length === 0) {
+    return (
+      <>
+        <style>{`
+          .srd { height: 100%; display: grid; place-items: center; padding: 40px; }
+          .srd__inner { max-width: 580px; text-align: center; display:flex; flex-direction: column; align-items: center; gap: 18px; }
+          .srd__t { font-family: var(--font-read); font-style: italic; font-weight: 400; font-size: 56px; letter-spacing: -0.024em; line-height: 1.05; color: var(--ink); }
+          .srd__sub { font-family: var(--font-read); font-size: 18px; color: var(--mute); line-height: 1.55; max-width: 44ch; }
+        `}</style>
+        <div className="srd">
+          <div className="srd__inner">
+            <div className="srd__t">All caught up.</div>
+            <div className="srd__sub">
+              No cards due right now
+              {topicTitle ? ` in ${topicTitle}` : ""}.
+              Come back tomorrow or add more topics to grow your deck.
+            </div>
+            <Link
+              href={topicSlug ? `/${track}/topics/${topicSlug}` : `/${track}/topics`}
+              className="btn btn--ghost"
+            >
+              {topicSlug ? "Back to topic" : `Browse ${TRACK_LABELS[track]} topics`}
+            </Link>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <Link
-          href={topicSlug ? `/${track}/topics/${topicSlug}` : `/${track}/topics`}
-          className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-        >
-          <ArrowLeft className="h-4 w-4" /> {topicSlug ? "Back to topic" : "All topics"}
-        </Link>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="outline">{TRACK_LABELS[track]}</Badge>
-          {topicTitle && <Badge variant="outline">{topicTitle}</Badge>}
-          <Badge variant="muted">{queue.length} due</Badge>
+    <>
+      <style>{`
+        .srs-wrap { height:100%; display:grid; grid-template-rows: auto 1fr; background: var(--bg); }
+        .srs-top { padding: 16px 32px 0; display:flex; align-items: center; gap: 14px; }
+        .srs-count { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
+        .srs-count b { color: var(--ink); font-weight: 600; }
+        .srs-bar { flex:1; height: 2px; background: var(--surf-3); border-radius: 999px; overflow: hidden; max-width: 520px; }
+        .srs-bar > i { display:block; height:100%; background: var(--accent); }
+        .srs-main { padding: 24px 32px; overflow:auto; }
+      `}</style>
+      <div className="srs-wrap">
+        <div className="srs-top">
+          <div className="srs-count">
+            <b>{queue.length}</b> due today
+            {topicTitle && <> · {topicTitle}</>}
+            {!topicTitle && <> · {TRACK_LABELS[track]}</>}
+          </div>
+          <div className="srs-bar">
+            <i style={{ width: "0%" }} />
+          </div>
+        </div>
+        <div className="srs-main">
+          <ReviewSession cards={queue} topicSlug={topicSlug} track={track} />
         </div>
       </div>
-
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">Review</h1>
-        <p className="text-muted-foreground mt-1">
-          {queue.length === 0
-            ? "No cards due — come back tomorrow or add more topics."
-            : `${queue.length} ${queue.length === 1 ? "card" : "cards"} due now${
-                topicTitle ? ` in ${topicTitle}` : ""
-              }.`}
-        </p>
-      </header>
-
-      <ReviewSession cards={queue} topicSlug={topicSlug} track={track} />
-    </div>
+    </>
   );
 }

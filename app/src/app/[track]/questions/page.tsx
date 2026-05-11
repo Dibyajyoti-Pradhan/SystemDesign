@@ -3,9 +3,6 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { questions, interviewSessions } from "@/db/schema";
 import { asc, eq, inArray, and, isNotNull } from "drizzle-orm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Clock, MessageSquare } from "lucide-react";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 import { LanguageFilter } from "@/components/LanguageFilter";
 
@@ -56,91 +53,105 @@ export default async function QuestionsPage({
   const empty = all.length === 0;
 
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">
-          {track === "coding" ? "Theoretical Q&A" : "Practice"}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {track === "coding"
-            ? `${TRACK_LABELS[track]} · explain-it-like-a-staff-engineer style questions. AI-vs-AI works on the title alone — no auto-generated answers.`
-            : "Pick a question to read the brief and start a session."}
-        </p>
-      </header>
+    <>
+      <style>{`
+        .ql { height:100%; overflow:auto; }
+        .ql__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
+        .ql__head { display:flex; align-items: end; gap: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+        .ql__h { font-size: 30px; font-weight: 600; letter-spacing: -0.024em; }
+        .ql__h em { font-family: var(--font-read); font-style: italic; font-weight: 400; color: var(--mute); }
+        .ql__sub { color: var(--mute); font-size: 14px; margin-top: 8px; max-width: 56ch; }
+        .ql__r { margin-left: auto; display:flex; gap:8px; }
+        .ql__counts { display:flex; gap:18px; padding: 14px 0 4px; }
+        .ql__counts span { font-family: var(--font-mono); font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.1em; }
+        .ql__counts b { color: var(--ink); font-weight:500; }
+        .qr { display:grid; grid-template-columns: 32px 1fr 80px 220px 80px 100px; gap:18px; padding: 16px 6px; border-bottom: 1px solid var(--line); align-items:center; cursor:pointer; text-decoration:none; color:inherit; }
+        .qr:hover { background: var(--bg-2); }
+        .qr__n { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); padding-left: 6px; }
+        .qr__t { font-size: 14.5px; color: var(--ink); letter-spacing: -0.005em; font-weight: 500; }
+        .qr__t em { display:block; font-family: var(--font-mono); font-size: 10px; color: var(--mute); margin-top:4px; font-style: normal; text-transform:uppercase; letter-spacing:.08em; }
+        .qr__d { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; }
+        .qr__tags { display:flex; gap: 5px; flex-wrap: wrap; }
+        .qr__tags span { font-family: var(--font-mono); font-size: 9.5px; color: var(--mute); border:1px solid var(--line); border-radius: 3px; padding: 1px 5px; text-transform: uppercase; letter-spacing: .08em; }
+        .qr__min { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-align: right; }
+        .qr__score { font-family: var(--font-mono); font-size: 12px; color: var(--ink); text-align: right; }
+        .qr__score em { color: var(--mute-2); font-style: normal; }
+        .qr__score.none { color: var(--accent); }
+        .ql__lang-filter { padding: 16px 0 4px; }
+      `}</style>
+      <div className="ql">
+        <div className="ql__inner">
+          <div className="ql__head">
+            <div>
+              <h1 className="ql__h">
+                {TRACK_LABELS[track]} <em>questions</em>
+              </h1>
+              <p className="ql__sub">
+                {track === "coding"
+                  ? "Explain-it-like-a-staff-engineer style questions. AI-vs-AI works on the title alone."
+                  : "Pick a question to read the brief and start a session."}
+              </p>
+            </div>
+            <div className="ql__r">
+              <div className="ql__counts">
+                <span><b>{all.length}</b> questions</span>
+                <span><b>{sessions.length}</b> attempts</span>
+              </div>
+            </div>
+          </div>
 
-      {track === "coding" && availableLanguages.length > 0 && (
-        <LanguageFilter
-          languages={availableLanguages}
-          activeLanguage={lang ?? null}
-          basePath={`/${track}/questions`}
-        />
-      )}
+          {track === "coding" && availableLanguages.length > 0 && (
+            <div className="ql__lang-filter">
+              <LanguageFilter
+                languages={availableLanguages}
+                activeLanguage={lang ?? null}
+                basePath={`/${track}/questions`}
+              />
+            </div>
+          )}
 
-      {empty ? (
-        <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
-            <p className="text-sm">
+          {empty ? (
+            <div style={{ padding: "48px 0", color: "var(--mute)", fontFamily: "var(--font-mono)", fontSize: 12, textAlign: "center" }}>
               {lang
                 ? `No questions for "${lang}" yet.`
                 : `No questions seeded for ${TRACK_LABELS[track]} yet.`}
-            </p>
-            <p className="text-xs mt-1">
-              {track === "coding"
-                ? <>Drop a JSON file at <code className="bg-muted px-1.5 py-0.5 rounded">coding/interview-questions/&lt;lang&gt;.json</code> and run <code className="bg-muted px-1.5 py-0.5 rounded">npm run seed</code>.</>
-                : <>Drop PDFs into <code className="bg-muted px-1.5 py-0.5 rounded">{track}/design-questions/</code> and run <code className="bg-muted px-1.5 py-0.5 rounded">npm run seed</code>.</>}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {all.map((q) => {
-            const past = sessionsByQuestion.get(q.id) ?? 0;
-            return (
-              <Link
-                key={q.id}
-                href={`/${track}/questions/${q.slug}`}
-                className="block group"
-              >
-                <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">
-                        <span className="text-muted-foreground font-mono text-xs mr-1.5">
-                          #{String(q.number ?? 0).padStart(2, "0")}
-                        </span>
-                        {q.title}
-                      </CardTitle>
-                      <Badge variant="outline" className="text-[10px] capitalize shrink-0">
-                        {q.difficulty}
-                      </Badge>
-                    </div>
-                    <CardDescription className="flex items-center gap-2 text-xs">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> ~{q.estMinutes} min
-                      </span>
-                      {q.language && (
-                        <>
-                          <span>·</span>
-                          <span className="capitalize">{q.language}</span>
-                        </>
-                      )}
-                      {past > 0 && (
-                        <>
-                          <span>·</span>
-                          <span className="inline-flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            {past} past
-                          </span>
-                        </>
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            );
-          })}
+            </div>
+          ) : (
+            <div>
+              {all.map((q, idx) => {
+                const past = sessionsByQuestion.get(q.id) ?? 0;
+                let tags: string[] = [];
+                try { tags = JSON.parse(q.tags ?? "[]"); } catch { tags = []; }
+                const diffColor =
+                  q.difficulty === "easy"
+                    ? "var(--good)"
+                    : q.difficulty === "hard"
+                    ? "var(--bad)"
+                    : "var(--warn)";
+                return (
+                  <Link key={q.id} href={`/${track}/questions/${q.slug}`} className="qr">
+                    <span className="qr__n">{String(q.number ?? idx + 1).padStart(2, "0")}</span>
+                    <span className="qr__t">
+                      {q.title}
+                      {q.language && <em>{q.language}</em>}
+                    </span>
+                    <span className="qr__d" style={{ color: diffColor }}>{q.difficulty}</span>
+                    <span className="qr__tags">
+                      {tags.slice(0, 4).map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </span>
+                    <span className="qr__min">~{q.estMinutes}m</span>
+                    <span className={`qr__score${past === 0 ? " none" : ""}`}>
+                      {past === 0 ? "start →" : <>{past}<em> sess</em></>}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

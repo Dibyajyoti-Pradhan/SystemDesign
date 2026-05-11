@@ -3,12 +3,48 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { topics, questions, cards, interviewSessions } from "@/db/schema";
 import { count, eq, lte, and, desc, isNotNull } from "drizzle-orm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, BookOpen, Library, MessageSquare, ArrowRight } from "lucide-react";
 import { relativeTime } from "@/lib/utils";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
+
+const CSS = `
+.hm { height:100%; overflow:auto; }
+.hm__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
+.hm__hero { display:grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
+.hm__eyebrow { font-family: var(--font-mono); font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; margin-bottom: 10px; }
+.hm__h { font-family: var(--font-ui); font-size: 38px; font-weight: 600; letter-spacing: -0.028em; line-height: 1.05; }
+.hm__h em { font-family: var(--font-read); font-style: italic; font-weight: 400; color: var(--accent-2); }
+.hm__sub { color: var(--mute); font-size: 15px; margin-top: 12px; max-width: 56ch; line-height: 1.55; }
+.hm__stats { display:grid; grid-template-columns: repeat(3, auto); gap: 32px; padding: 4px 0 6px; }
+.stat { display:flex; flex-direction: column; gap: 2px; }
+.stat__n { font-family: var(--font-read); font-style: italic; font-weight: 400; font-size: 36px; line-height: 1; letter-spacing: -0.02em; }
+.stat__l { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; margin-top: 4px; }
+.stat--accent .stat__n { color: var(--accent); }
+.hm__row { display:grid; grid-template-columns: 1fr 360px; gap: 36px; padding-top: 32px; }
+.blk { display:flex; flex-direction: column; gap: 14px; }
+.blk__h { display:flex; align-items: baseline; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.blk__h .lbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .14em; }
+.blk__h .ct { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); margin-left: auto; }
+.rec { display:flex; flex-direction: column; gap: 10px; }
+.rec__r { display:grid; grid-template-columns: 60px 1fr auto; gap: 12px; padding: 12px 14px; border:1px solid var(--line); border-radius: 8px; background: var(--bg-2); align-items: center; }
+.rec__k { font-family: var(--font-mono); font-size: 9.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .14em; }
+.rec__t { font-size: 13.5px; color: var(--ink); letter-spacing: -0.005em; }
+.rec__t em { display:block; font-family: var(--font-mono); font-size: 10px; color: var(--mute-2); margin-top: 3px; font-style: normal; text-transform: uppercase; letter-spacing: .08em; }
+.rec__ago { font-family: var(--font-mono); font-size: 11px; color: var(--mute); }
+.plan { display:flex; flex-direction: column; gap: 10px; }
+.plan__item { display:flex; align-items: center; gap: 14px; padding: 14px 16px; border:1px solid var(--line); border-radius: 8px; background: var(--bg-2); text-decoration: none; color: inherit; }
+.plan__item:hover { border-color: var(--line-2); background: var(--surf); }
+.plan__num { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); width: 18px; }
+.plan__text { font-size: 13.5px; color: var(--ink); letter-spacing: -0.005em; flex:1; }
+.plan__arrow { color: var(--mute-2); font-size: 16px; }
+.plan__item:hover .plan__arrow { color: var(--accent); }
+`;
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 export default async function TrackHome({
   params,
@@ -64,123 +100,145 @@ export default async function TrackHome({
     .orderBy(desc(interviewSessions.startedAt))
     .limit(3);
 
+  // Build a combined "recently" list
+  type RecentItem =
+    | { kind: "topic"; id: number; title: string; slug: string; ts: Date }
+    | { kind: "session"; id: number; title: string | null; score: number | null; ts: Date };
+
+  const recentItems: RecentItem[] = [
+    ...recentTopics.map((t) => ({
+      kind: "topic" as const,
+      id: t.id,
+      title: t.title,
+      slug: t.slug,
+      ts: t.lastVisitedAt!,
+    })),
+    ...recentSessions.map((s) => ({
+      kind: "session" as const,
+      id: s.id,
+      title: s.title,
+      score: s.score,
+      ts: s.startedAt,
+    })),
+  ]
+    .sort((a, b) => b.ts.getTime() - a.ts.getTime())
+    .slice(0, 6);
+
+  const trackLabel = TRACK_LABELS[track];
+  const greeting = getGreeting();
+
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight">{TRACK_LABELS[track]}</h1>
-        <p className="text-muted-foreground mt-1">Your daily 15 minutes to ace the interview.</p>
-      </header>
-
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-primary/20">
-          <CardHeader className="pb-3">
-            <CardDescription>Today&apos;s queue</CardDescription>
-            <CardTitle className="text-3xl">{dueCount.n}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">
-              {dueCount.n === 0 ? "Caught up. Nice." : `cards due for review`}
+    <div className="hm">
+      <style>{CSS}</style>
+      <div className="hm__inner">
+        {/* Hero */}
+        <div className="hm__hero">
+          <div>
+            <div className="hm__eyebrow">{trackLabel}</div>
+            <h1 className="hm__h">
+              {greeting}. Pick up where you <em>left off.</em>
+            </h1>
+            <p className="hm__sub">
+              {activeCardCount.n} cards in your deck
+              {dueCount.n > 0 ? `, ${dueCount.n} due today` : ", all caught up"}.{" "}
+              {topicCount.n} topics · {questionCount.n} questions.
             </p>
-            <Button asChild size="sm" disabled={dueCount.n === 0}>
-              <Link href={`/${track}/review`}>
-                <Sparkles className="h-4 w-4" />
-                Start review
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="hm__stats">
+            <div className={`stat${dueCount.n > 0 ? " stat--accent" : ""}`}>
+              <span className="stat__n">{dueCount.n}</span>
+              <span className="stat__l">Cards due</span>
+            </div>
+            <div className="stat">
+              <span className="stat__n">{topicCount.n}</span>
+              <span className="stat__l">Topics</span>
+            </div>
+            <div className="stat">
+              <span className="stat__n">{questionCount.n}</span>
+              <span className="stat__l">Questions</span>
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Library</CardDescription>
-            <CardTitle className="text-3xl">{topicCount.n}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <p className="text-sm text-muted-foreground">topics · {questionCount.n} questions</p>
-            <Button asChild variant="ghost" size="sm" className="px-0 h-auto">
-              <Link href={`/${track}/topics`}>
-                Browse topics <ArrowRight className="h-3 w-3" />
+        {/* Two-column row */}
+        <div className="hm__row">
+          {/* Left: Tonight's plan */}
+          <div className="blk">
+            <div className="blk__h">
+              <span className="lbl">Tonight&apos;s plan</span>
+            </div>
+            <div className="plan">
+              <Link href={`/${track}/review`} className="plan__item">
+                <span className="plan__num">01</span>
+                <span className="plan__text">
+                  Review {dueCount.n} due card{dueCount.n !== 1 ? "s" : ""}
+                </span>
+                <span className="plan__arrow">›</span>
               </Link>
-            </Button>
-          </CardContent>
-        </Card>
+              <Link href={`/${track}/topics`} className="plan__item">
+                <span className="plan__num">02</span>
+                <span className="plan__text">
+                  Browse topics ({topicCount.n} available)
+                </span>
+                <span className="plan__arrow">›</span>
+              </Link>
+              <Link href={`/${track}/questions`} className="plan__item">
+                <span className="plan__num">03</span>
+                <span className="plan__text">Mock interview</span>
+                <span className="plan__arrow">›</span>
+              </Link>
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Cards</CardDescription>
-            <CardTitle className="text-3xl">{activeCardCount.n}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <p className="text-sm text-muted-foreground">
-              active{" "}
-              {pendingCount.n > 0 && (
-                <Badge variant="muted" className="ml-1">
-                  {pendingCount.n} pending review
-                </Badge>
+          {/* Right: Recently */}
+          <div className="blk">
+            <div className="blk__h">
+              <span className="lbl">Recently</span>
+              <span className="ct">{recentItems.length} items</span>
+            </div>
+            <div className="rec">
+              {recentItems.length === 0 ? (
+                <p style={{ color: "var(--mute)", fontSize: "13px" }}>
+                  Nothing yet — start exploring topics.
+                </p>
+              ) : (
+                recentItems.map((item) =>
+                  item.kind === "topic" ? (
+                    <Link
+                      key={`topic-${item.id}`}
+                      href={`/${track}/topics/${item.slug}`}
+                      style={{ textDecoration: "none" }}
+                    >
+                      <div className="rec__r">
+                        <span className="rec__k">Topic</span>
+                        <span className="rec__t">{item.title}</span>
+                        <span className="rec__ago">{relativeTime(item.ts)}</span>
+                      </div>
+                    </Link>
+                  ) : (
+                    <Link
+                      key={`session-${item.id}`}
+                      href={`/interview/sessions/${item.id}`}
+                      style={{ textDecoration: "none" }}
+                    >
+                      <div className="rec__r">
+                        <span className="rec__k">Session</span>
+                        <span className="rec__t">
+                          {item.title ?? `Session #${item.id}`}
+                          {item.score != null && (
+                            <em>{item.score}/100</em>
+                          )}
+                        </span>
+                        <span className="rec__ago">{relativeTime(item.ts)}</span>
+                      </div>
+                    </Link>
+                  )
+                )
               )}
-            </p>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Library className="h-4 w-4" /> Recent topics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentTopics.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Visit a topic to start tracking.</p>
-            ) : (
-              <ul className="space-y-2">
-                {recentTopics.map((t) => (
-                  <li key={t.id} className="flex justify-between items-center text-sm">
-                    <Link href={`/${track}/topics/${t.slug}`} className="hover:underline">
-                      {t.title}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">{relativeTime(t.lastVisitedAt)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <MessageSquare className="h-4 w-4" /> Recent sessions
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentSessions.length === 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">No sessions yet — start your first interview.</p>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/${track}/questions`}>
-                    <BookOpen className="h-4 w-4" /> Start one
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {recentSessions.map((s) => (
-                  <li key={s.id} className="flex justify-between items-center text-sm">
-                    <Link href={`/interview/sessions/${s.id}`} className="hover:underline truncate">
-                      {s.title ?? `Session #${s.id}`}
-                    </Link>
-                    <span className="text-xs text-muted-foreground">
-                      {s.score != null ? `${s.score}/100` : "in progress"}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      </section>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

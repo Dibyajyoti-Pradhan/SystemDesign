@@ -6,17 +6,6 @@ import matter from "gray-matter";
 import { db } from "@/db/client";
 import { questions, interviewSessions } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  Clock,
-  ExternalLink,
-  User,
-  Bot,
-  FileText,
-} from "lucide-react";
 import { CONTENT_ROOT, parseTrack } from "@/lib/paths";
 import { MdxRenderer } from "@/components/MdxRenderer";
 import { relativeTime } from "@/lib/utils";
@@ -72,132 +61,157 @@ export default async function QuestionDetailPage({
     .where(eq(interviewSessions.questionId, q.id))
     .orderBy(desc(interviewSessions.startedAt));
 
+  const diffColor =
+    q.difficulty === "easy"
+      ? "var(--good)"
+      : q.difficulty === "hard"
+      ? "var(--bad)"
+      : "var(--warn)";
+
   return (
-    <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <Link
-        href={`/${track}/questions`}
-        className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-      >
-        <ArrowLeft className="h-4 w-4" /> All questions
-      </Link>
+    <>
+      <style>{`
+        .qd { height:100%; overflow:auto; }
+        .qd__inner { max-width: 920px; margin: 0 auto; padding: 36px 36px 64px; display:flex; flex-direction: column; gap: 28px; }
+        .qd__head { display:flex; flex-direction: column; gap:12px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+        .qd__meta { display:flex; gap:8px; align-items: center; flex-wrap:wrap; }
+        .qd__t { font-size: 32px; font-weight: 600; letter-spacing: -0.024em; line-height: 1.1; }
+        .qd__sub { color: var(--mute); font-size: 14.5px; max-width: 60ch; line-height: 1.55; }
+        .brief { font-family: var(--font-read); font-size: 16.5px; line-height: 1.65; color: var(--ink-2); display:flex; flex-direction: column; gap: 14px; }
+        .brief h3 { font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--ink); margin: 12px 0 0; letter-spacing: -0.005em; }
+        .brief ul { margin: 0; padding-left: 0; list-style: none; }
+        .brief li { padding: 4px 0 4px 22px; position: relative; }
+        .brief li::before { content:"—"; position: absolute; left: 0; color: var(--mute-2); font-family: var(--font-mono); }
+        .ctas { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .cta { padding: 18px 20px; border:1px solid var(--line); border-radius: 10px; background: var(--bg-2); display:flex; flex-direction: column; gap: 6px; cursor:pointer; text-decoration:none; }
+        .cta:hover { border-color: var(--line-2); background: var(--surf); }
+        .cta.is-primary { border-color: var(--accent); background: rgba(212,165,116,0.04); }
+        .cta__lbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); text-transform: uppercase; letter-spacing: .14em; }
+        .cta__t { font-size: 17px; font-weight: 600; letter-spacing: -0.012em; }
+        .cta__d { color: var(--mute); font-size: 13px; line-height: 1.5; max-width: 40ch; }
+        .cta__go { display:flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: .1em; margin-top: 6px; }
+        .hist__h { display:flex; align-items: baseline; gap:14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+        .hist__lbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .14em; }
+        .hist__ct { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); }
+        .hist__r { display:grid; grid-template-columns: 60px 1fr 70px 70px 24px; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: center; cursor:pointer; text-decoration:none; color:inherit; }
+        .hist__r:last-child { border-bottom: 0; }
+        .hist__date { font-family: var(--font-mono); font-size: 11px; color: var(--mute); }
+        .hist__mode { font-size: 13px; color: var(--ink); }
+        .hist__mode em { display:block; font-family: var(--font-mono); font-size: 10px; color: var(--mute); margin-top: 3px; font-style: normal; text-transform: uppercase; letter-spacing: .08em; }
+        .hist__turns { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-align: right; }
+        .hist__sc { font-family: var(--font-mono); font-size: 13px; color: var(--ink); text-align: right; }
+        .hist__sc em { color: var(--mute-2); font-style: normal; }
+        .qd__back { display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-decoration:none; text-transform:uppercase; letter-spacing:.08em; }
+        .qd__back:hover { color: var(--ink); }
+        .qd__brief-placeholder { font-family: var(--font-read); font-size: 15px; color: var(--mute); font-style: italic; }
+      `}</style>
+      <div className="qd">
+        <div className="qd__inner">
 
-      <header className="space-y-2">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="font-mono">#{String(q.number ?? 0).padStart(2, "0")}</span>
-          <Badge variant="outline" className="capitalize">{q.difficulty}</Badge>
-          {q.language && <Badge variant="muted" className="capitalize">{q.language}</Badge>}
-          <span className="inline-flex items-center gap-1">
-            <Clock className="h-3 w-3" /> ~{q.estMinutes} min
-          </span>
-        </div>
-        <h1 className="text-4xl font-bold tracking-tight">{q.title}</h1>
-      </header>
-
-      <div className="flex flex-wrap gap-2">
-        <Button asChild size="lg">
-          <Link href={`/interview/start/${q.slug}`}>
-            <User className="h-4 w-4" /> Try yourself
+          {/* Back link */}
+          <Link href={`/${track}/questions`} className="qd__back">
+            ← All questions
           </Link>
-        </Button>
-        <Button asChild variant="secondary" size="lg">
-          <Link href={`/interview/ai-vs-ai/start/${q.slug}`}>
-            <Bot className="h-4 w-4" /> Watch AI vs AI
-          </Link>
-        </Button>
-        {q.pdfPath && (
-          <Button asChild variant="outline" size="lg">
-            <a href={`/api/pdf?path=${encodeURIComponent(q.pdfPath)}`} target="_blank">
-              <ExternalLink className="h-4 w-4" /> Reference PDF
-            </a>
-          </Button>
-        )}
-      </div>
 
-      {briefBody ? (
-        <section className="space-y-3">
-          <Card>
-            <CardContent className="py-6">
-              <div className="prose-system">
+          {/* Header */}
+          <div className="qd__head">
+            <div className="qd__meta">
+              <span className="badge" style={{ fontFamily: "var(--font-mono)", fontSize: 10 }}>
+                #{String(q.number ?? 0).padStart(2, "0")}
+              </span>
+              <span className="badge" style={{ color: diffColor, borderColor: diffColor + "44" }}>
+                {q.difficulty}
+              </span>
+              {q.language && (
+                <span className="badge">{q.language}</span>
+              )}
+              <span className="badge">~{q.estMinutes} min</span>
+              <div style={{ marginLeft: "auto" }}>
+                <GenerateBriefButton slug={q.slug} />
+              </div>
+            </div>
+            <h1 className="qd__t">{q.title}</h1>
+            {q.pdfPath && (
+              <p className="qd__sub">
+                <a
+                  href={`/api/pdf?path=${encodeURIComponent(q.pdfPath)}`}
+                  target="_blank"
+                  style={{ color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: 11, textTransform: "uppercase", letterSpacing: ".08em" }}
+                >
+                  Reference PDF ↗
+                </a>
+              </p>
+            )}
+          </div>
+
+          {/* Brief content */}
+          <div>
+            {briefBody ? (
+              <div className="brief">
                 <MdxRenderer source={briefBody} />
               </div>
-            </CardContent>
-          </Card>
-        </section>
-      ) : track === "system-design" && q.pdfPath ? (
-        <section className="space-y-3">
-          <Card className="border-primary/20 bg-primary/5">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-4 w-4" /> No brief yet
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Generate a tight problem brief from the source PDF — only the question, never the
-                solution. Uses your Claude Code subscription. ~20–40 seconds.
+            ) : (
+              <p className="qd__brief-placeholder">
+                No brief generated yet — click Generate Brief to create one.
               </p>
-              <GenerateBriefButton slug={q.slug} />
-            </CardContent>
-          </Card>
-        </section>
-      ) : (
-        <section className="space-y-3">
-          <Card>
-            <CardContent className="py-6">
-              <p className="text-sm text-muted-foreground italic">No description available.</p>
-            </CardContent>
-          </Card>
-        </section>
-      )}
+            )}
+          </div>
 
-      {sessions.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">
-            Past sessions <span className="text-muted-foreground font-normal">({sessions.length})</span>
-          </h2>
-          <Card>
-            <CardContent className="p-0 divide-y">
+          {/* CTAs */}
+          <div className="ctas">
+            <Link href={`/interview/start/${q.slug}`} className="cta is-primary">
+              <span className="cta__lbl">Self practice</span>
+              <span className="cta__t">Try yourself</span>
+              <span className="cta__d">Interview yourself with AI as the interviewer. You answer, AI pushes back.</span>
+              <span className="cta__go">Start session →</span>
+            </Link>
+            <Link href={`/interview/ai-vs-ai/start/${q.slug}`} className="cta">
+              <span className="cta__lbl">AI vs AI</span>
+              <span className="cta__t">Watch AI vs AI</span>
+              <span className="cta__d">Two AI agents — one interviewer, one candidate — debate this question live.</span>
+              <span className="cta__go">Watch now →</span>
+            </Link>
+          </div>
+
+          {/* Session history */}
+          {sessions.length > 0 && (
+            <div>
+              <div className="hist__h">
+                <span className="hist__lbl">Past sessions</span>
+                <span className="hist__ct">{sessions.length}</span>
+              </div>
               {sessions.map((s) => {
                 const turns = turnCount(s.transcript);
-                const ended = !!s.endedAt;
+                const modeLabel = s.mode === "ai_vs_ai" ? "AI vs AI" : "Self";
+                const modeSubLabel = s.mode === "ai_vs_ai" ? "watched" : "practiced";
                 return (
-                  <div key={s.id} className="flex items-center gap-3 p-3 group">
-                    {s.mode === "ai_vs_ai" ? (
-                      <Bot className="h-4 w-4 text-muted-foreground shrink-0" />
-                    ) : (
-                      <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                    )}
-                    <Link
-                      href={`/interview/sessions/${s.id}`}
-                      className="flex-1 min-w-0 text-sm hover:text-primary transition-colors"
-                    >
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span>{relativeTime(s.startedAt)}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">{turns} turn{turns === 1 ? "" : "s"}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">{s.mode === "ai_vs_ai" ? "AI vs AI" : "Yourself"}</span>
-                        {ended ? (
-                          typeof s.score === "number" ? (
-                            <Badge variant="default" className="text-[10px] ml-1">{s.score}/100</Badge>
-                          ) : (
-                            <Badge variant="muted" className="text-[10px] ml-1">ended</Badge>
-                          )
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] ml-1">in progress</Badge>
-                        )}
-                      </div>
+                  <div key={s.id} style={{ display: "grid", gridTemplateColumns: "60px 1fr 70px 70px 24px", gap: 14, padding: "12px 0", borderBottom: "1px solid var(--line)", alignItems: "center" }}>
+                    <span className="hist__date">{relativeTime(s.startedAt)}</span>
+                    <Link href={`/interview/sessions/${s.id}`} className="hist__r" style={{ display: "contents", textDecoration: "none", color: "inherit" }}>
+                      <span className="hist__mode" style={{ gridColumn: "2" }}>
+                        {modeLabel}
+                        <em>{modeSubLabel}</em>
+                      </span>
                     </Link>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DeleteSessionButton sessionId={s.id} iconOnly />
-                    </div>
+                    <span className="hist__turns">{turns}t</span>
+                    <span className="hist__sc">
+                      {typeof s.score === "number" ? (
+                        <>{s.score}<em>/100</em></>
+                      ) : s.endedAt ? (
+                        <em>done</em>
+                      ) : (
+                        <em>live</em>
+                      )}
+                    </span>
+                    <DeleteSessionButton sessionId={s.id} iconOnly />
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
-        </section>
-      )}
-    </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </>
   );
 }

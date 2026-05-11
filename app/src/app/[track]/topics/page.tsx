@@ -3,12 +3,46 @@ import Link from "next/link";
 import { db } from "@/db/client";
 import { topics } from "@/db/schema";
 import { and, asc, eq, isNotNull } from "drizzle-orm";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { FileText, CheckCircle2, Network } from "lucide-react";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 import { LanguageFilter } from "@/components/LanguageFilter";
+
+const CSS = `
+.tl { height:100%; overflow:auto; }
+.tl__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
+.tl__head { display:flex; align-items: end; gap: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+.tl__h { font-size: 30px; font-weight: 600; letter-spacing: -0.024em; line-height: 1.1; }
+.tl__h em { font-family: var(--font-read); font-style: italic; font-weight: 400; color: var(--mute); }
+.tl__sub { color: var(--mute); font-size: 14px; margin-top: 8px; max-width: 56ch; }
+.tl__sort { margin-left: auto; display:flex; gap: 8px; align-items: center; }
+.tl__counts { display:flex; gap: 18px; padding: 14px 0 4px; }
+.tl__counts span { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; }
+.tl__counts b { color: var(--ink); font-weight: 500; }
+.grp { padding-top: 28px; }
+.grp__h { display:flex; align-items: baseline; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.grp__k { font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; letter-spacing: -0.005em; }
+.grp__n { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute-2); text-transform: uppercase; letter-spacing: .1em; }
+.grp__avg { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; }
+.grp__avg b { color: var(--accent); font-weight: 500; }
+.tl__row { display:grid; grid-template-columns: 32px 1fr 110px 80px 24px; gap: 18px; padding: 16px 6px 16px 0; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; text-decoration: none; color: inherit; }
+.tl__row:hover { background: var(--bg-2); }
+.row__n { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); padding-left: 6px; }
+.row__main { display:flex; flex-direction: column; gap: 4px; min-width: 0; }
+.row__t { display:flex; align-items: baseline; gap: 10px; }
+.row__ttl { font-size: 14.5px; color: var(--ink); letter-spacing: -0.005em; font-weight: 500; }
+.row__sum { color: var(--mute); font-size: 13px; line-height: 1.45; max-width: 78ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row__bar { display:flex; align-items: center; gap: 8px; }
+.row__bar .b { flex:1; height: 3px; background: var(--surf-3); border-radius: 999px; overflow: hidden; }
+.row__bar .b > i { display:block; height:100%; background: var(--ink-2); }
+.row__bar .b > i.acc { background: var(--accent); }
+.row__pct { font-family: var(--font-mono); font-size: 11px; color: var(--ink); width: 24px; text-align: right; }
+.row__cards { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-align: right; }
+.row__cards b { color: var(--ink-2); font-weight: 500; }
+.row__chev { color: var(--mute-2); display:flex; justify-content: center; }
+.tl__row:hover .row__chev { color: var(--ink); }
+.row.is-pdf .row__ttl { color: var(--mute); }
+.pdfb { font-family: var(--font-mono); font-size: 9.5px; color: var(--mute-2); padding: 1px 5px; border:1px solid var(--line); border-radius: 3px; text-transform: uppercase; letter-spacing: .12em; }
+.lang-filter { display:flex; gap: 8px; padding: 16px 0 4px; flex-wrap: wrap; }
+`;
 
 export default async function TopicsPage({
   params,
@@ -50,71 +84,96 @@ export default async function TopicsPage({
     grouped.get(t.category)!.push(t);
   }
 
+  let globalIdx = 0;
+
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-8">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Topics</h1>
-          <p className="text-muted-foreground mt-1">
-            {TRACK_LABELS[track]} · {all.length} concepts across {grouped.size} categories.
-          </p>
+    <div className="tl">
+      <style>{CSS}</style>
+      <div className="tl__inner">
+        {/* Header */}
+        <div className="tl__head">
+          <div>
+            <h1 className="tl__h">
+              Topics <em>· {TRACK_LABELS[track]}</em>
+            </h1>
+            <p className="tl__sub">
+              {all.length} concepts across {grouped.size} categories.
+            </p>
+          </div>
         </div>
-        {track === "system-design" && (
-          <Link
-            href="/concept-map"
-            className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-          >
-            <Network className="h-4 w-4" /> Map view
-          </Link>
+
+        {/* Counts strip */}
+        <div className="tl__counts">
+          <span><b>{all.length}</b> Topics</span>
+          <span><b>{grouped.size}</b> Categories</span>
+          <span><b>{all.filter((t) => t.mdxPath).length}</b> Ready</span>
+        </div>
+
+        {/* Language filter for coding track */}
+        {track === "coding" && availableLanguages.length > 0 && (
+          <div className="lang-filter">
+            <LanguageFilter
+              languages={availableLanguages}
+              activeLanguage={lang ?? null}
+              basePath={`/${track}/topics`}
+            />
+          </div>
         )}
-      </header>
 
-      {track === "coding" && availableLanguages.length > 0 && (
-        <LanguageFilter
-          languages={availableLanguages}
-          activeLanguage={lang ?? null}
-          basePath={`/${track}/topics`}
-        />
-      )}
-
-      {grouped.size === 0 && (
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
+        {grouped.size === 0 && (
+          <div style={{ padding: "48px 0", textAlign: "center", color: "var(--mute)", fontSize: "14px" }}>
             No topics yet — upload a PDF to get started.
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {[...grouped.entries()].map(([category, items]) => (
-        <section key={category} className="space-y-3">
-          <h2 className="text-xl font-semibold tracking-tight">{category}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {items.map((t) => (
-              <Link key={t.id} href={`/${track}/topics/${t.slug}`} className="block group">
-                <Card className="h-full transition-all hover:border-primary/40 hover:shadow-md">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start gap-2">
-                      <CardTitle className="text-base group-hover:text-primary transition-colors">{t.title}</CardTitle>
-                      {t.mdxPath ? (
-                        <Badge variant="muted" className="text-[10px]"><CheckCircle2 className="h-3 w-3 mr-1" />Ready</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px]"><FileText className="h-3 w-3 mr-1" />Raw</Badge>
+        {/* Grouped topic list */}
+        {[...grouped.entries()].map(([category, items]) => {
+          const avgMastery = Math.round(items.reduce((a, t) => a + t.mastery, 0) / items.length);
+          return (
+            <div key={category} className="grp">
+              <div className="grp__h">
+                <span className="grp__k">{category}</span>
+                <span className="grp__n">{items.length} topics</span>
+                <span className="grp__avg">Avg mastery <b>{avgMastery}%</b></span>
+              </div>
+              {items.map((t) => {
+                globalIdx += 1;
+                const idx = globalIdx;
+                const isPdf = !t.mdxPath;
+                return (
+                  <Link
+                    key={t.id}
+                    href={`/${track}/topics/${t.slug}`}
+                    className={`tl__row${isPdf ? " row is-pdf" : ""}`}
+                  >
+                    <span className="row__n">{String(idx).padStart(2, "0")}</span>
+                    <div className="row__main">
+                      <div className="row__t">
+                        <span className="row__ttl">{t.title}</span>
+                        {isPdf && <span className="pdfb">PDF</span>}
+                      </div>
+                      {t.summary && (
+                        <span className="row__sum">{t.summary}</span>
                       )}
                     </div>
-                    {t.summary && <CardDescription className="line-clamp-2">{t.summary}</CardDescription>}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-2">
-                      <Progress value={t.mastery} className="flex-1" />
-                      <span className="text-xs text-muted-foreground w-10 text-right">{t.mastery}%</span>
+                    <div className="row__bar">
+                      <div className="b">
+                        <i
+                          className={t.mastery >= 80 ? "acc" : ""}
+                          style={{ width: `${t.mastery}%` }}
+                        />
+                      </div>
+                      <span className="row__pct">{t.mastery}%</span>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </section>
-      ))}
+                    <span className="row__cards">—</span>
+                    <span className="row__chev">›</span>
+                  </Link>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

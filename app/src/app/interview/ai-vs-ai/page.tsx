@@ -193,18 +193,60 @@ export default function AiVsAiPage() {
     setRunning(false);
   }
 
+  const VSAI_CSS = `
+.vsai { height:100%; display:grid; grid-template-rows: auto 1fr auto; background: var(--bg); }
+.vs__meta { display:flex; align-items: center; gap: 14px; padding: 14px 36px 12px; border-bottom: 1px solid var(--line); }
+.vs__title { font-size: 16px; font-weight: 600; letter-spacing: -0.012em; }
+.vs__title small { color: var(--mute); font-weight: 400; margin-left: 8px; }
+.vs__feed { overflow:auto; padding: 24px 36px 28px; }
+.vs__lane { max-width: 920px; margin: 0 auto; display:flex; flex-direction: column; gap: 22px; }
+.vs-turn { display:grid; grid-template-columns: 92px 1fr; gap: 18px; }
+.vs-turn .gut { display:flex; flex-direction: column; align-items: flex-end; padding-top: 4px; gap: 4px; }
+.vs-turn .who { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; }
+.vs-turn .num { font-family: var(--font-mono); font-size: 10px; color: var(--mute-2); }
+.vs-turn.t-i .who { color: var(--accent); }
+.vs-turn.t-c .who { color: var(--info); }
+.vs-turn .body { font-size: 14.5px; line-height: 1.6; color: var(--ink-2); padding: 10px 14px; border-radius: 8px; background: var(--surf); border:1px solid var(--line); max-width: 70ch; position: relative; }
+.vs-turn.t-i .body { background: var(--bg-2); border-color: var(--line); }
+.vs-turn.t-i .body::before { content:""; position:absolute; left:-1px; top:14px; bottom:14px; width:2px; background: var(--accent); border-radius: 2px; }
+.vs-turn.t-c .body::before { content:""; position:absolute; left:-1px; top:14px; bottom:14px; width:2px; background: var(--info); border-radius: 2px; }
+.vs-bar { border-top: 1px solid var(--line); background: var(--bg-2); padding: 12px 36px; display:grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; }
+.vs-bar .comp { background: var(--surf); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px 8px 12px; display:flex; align-items:center; gap: 12px; font-size: 13.5px; color: var(--ink-2); }
+.vs-bar .comp__seg { display:flex; gap:1px; padding: 2px; border:1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.vs-bar .comp__seg span { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); padding: 4px 9px; border-radius: 4px; cursor:pointer; text-transform: uppercase; letter-spacing: .05em; }
+.vs-bar .comp__seg span.is-on { background: var(--surf-2); color: var(--ink); }
+.stave { display:flex; align-items: center; gap: 10px; margin-left: auto; }
+.stave__lbl { font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; }
+.stave__tick { width: 6px; height: 14px; background: var(--surf-3); border-radius: 1px; }
+.stave__tick.is-done { background: var(--ink-2); }
+.stave__tick.is-now { background: var(--accent); }
+.vs-select { background: var(--surf); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font-size: 12px; color: var(--ink); font-family: var(--font-mono); cursor: pointer; }
+.vs-select:focus { outline: none; border-color: var(--line-2); }
+`;
+
+  // Build turn list including streaming
+  const allTurns = [
+    ...messages.filter((m) => m.role !== "steer"),
+    ...(streamingRole ? [{ role: streamingRole, content: streamingText, ts: Date.now() }] : []),
+  ] as AiMsg[];
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
-      {/* Header */}
-      <header className="shrink-0 border-b px-4 py-2 flex items-center gap-3 bg-background flex-wrap">
-        <span className="text-sm font-semibold">AI vs AI Interview</span>
+    <div className="vsai">
+      <style>{VSAI_CSS}</style>
+
+      {/* Header / meta */}
+      <div className="vs__meta">
+        <span className="vs__title">
+          AI vs AI
+          <small>Interview Simulator</small>
+        </span>
 
         {!sessionStarted && (
           <>
             <select
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring"
+              className="vs-select"
             >
               {TOPICS.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -214,121 +256,131 @@ export default function AiVsAiPage() {
             <select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-              className="text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring capitalize"
+              className="vs-select"
             >
               {DIFFICULTIES.map((d) => (
-                <option key={d} value={d} className="capitalize">{d}</option>
+                <option key={d} value={d} style={{ textTransform: "capitalize" }}>{d}</option>
               ))}
             </select>
 
-            <Button size="sm" onClick={startSession}>
-              <Play className="h-3.5 w-3.5" /> Start Session
-            </Button>
+            <button className="btn btn--primary" onClick={startSession} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <Play size={13} /> Start Session
+            </button>
           </>
         )}
 
         {sessionStarted && (
           <>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {ended ? (
-                <Badge variant="outline">ended</Badge>
-              ) : paused ? (
-                <Badge variant="outline">paused</Badge>
-              ) : running ? (
-                <Badge className="gap-1">
-                  {streamingRole === "interviewer" ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                  {streamingRole ?? "…"} thinking
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="gap-1">
-                  {agentUp === "interviewer" ? <Bot className="h-3 w-3" /> : <User className="h-3 w-3" />}
-                  {agentUp} up
-                </Badge>
-              )}
-            </div>
+            {ended ? (
+              <span className="badge">ended</span>
+            ) : paused ? (
+              <span className="badge">paused</span>
+            ) : running ? (
+              <span className="badge badge--accent" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                {streamingRole === "interviewer" ? <Bot size={11} /> : <User size={11} />}
+                {streamingRole ?? "…"} thinking
+              </span>
+            ) : (
+              <span className="badge" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                {agentUp === "interviewer" ? <Bot size={11} /> : <User size={11} />}
+                {agentUp} up
+              </span>
+            )}
 
-            {/* Auto speed */}
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground">Auto:</span>
+            {/* Auto speed segmented control */}
+            <div className="comp__seg" style={{ display: "flex", gap: 1, padding: 2, border: "1px solid var(--line)", borderRadius: 6, background: "var(--bg)" }}>
               {[1000, 3000, 5000].map((ms) => (
-                <button
+                <span
                   key={ms}
-                  type="button"
+                  className={autoInterval === ms ? "is-on" : ""}
                   onClick={() => setAutoInterval(ms)}
-                  className={`px-2 py-0.5 rounded border text-xs ${
-                    autoInterval === ms ? "bg-primary text-primary-foreground border-primary" : "border-border"
-                  }`}
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 10.5, color: autoInterval === ms ? "var(--ink)" : "var(--mute)", padding: "4px 9px", borderRadius: 4, cursor: "pointer", background: autoInterval === ms ? "var(--surf-2)" : "transparent", textTransform: "uppercase", letterSpacing: ".05em" }}
                 >
                   {ms / 1000}s
-                </button>
+                </span>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 ml-auto">
+            {/* Turn stave */}
+            <div className="stave">
+              <span className="stave__lbl">turns</span>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`stave__tick${i < allTurns.length - (running ? 1 : 0) ? " is-done" : running && i === allTurns.length - 1 ? " is-now" : ""}`}
+                />
+              ))}
+            </div>
+
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
               {paused && !ended ? (
-                <Button size="sm" onClick={() => setPaused(false)} disabled={running || !sessionId}>
-                  <Play className="h-3.5 w-3.5" /> Resume
-                </Button>
+                <button className="btn btn--primary" onClick={() => setPaused(false)} disabled={running || !sessionId} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Play size={13} /> Resume
+                </button>
               ) : !ended ? (
-                <Button size="sm" variant="outline" onClick={() => setPaused(true)}>
-                  <Pause className="h-3.5 w-3.5" /> Pause
-                </Button>
+                <button className="btn btn--ghost" onClick={() => setPaused(true)} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Pause size={13} /> Pause
+                </button>
               ) : null}
 
-              <Button
-                size="sm"
-                variant="outline"
+              <button
+                className="btn btn--ghost"
                 onClick={() => { if (!running && !ended && sessionId) void step(); }}
                 disabled={running || ended || !sessionId}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}
               >
-                <StepForward className="h-3.5 w-3.5" /> Step
-              </Button>
+                <StepForward size={13} /> Step
+              </button>
 
               {running && (
-                <Button size="sm" variant="ghost" onClick={stop}>
-                  <Square className="h-3.5 w-3.5" /> Stop
-                </Button>
+                <button className="btn btn--ghost" onClick={stop} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Square size={13} /> Stop
+                </button>
               )}
             </div>
           </>
         )}
-      </header>
+      </div>
 
-      {/* Main area */}
-      <div className="flex flex-1 min-h-0">
-        {/* Whiteboard (read-only for AI candidate's drawings) — 60% */}
-        <div className="w-3/5 min-h-0 border-r">
-          {sessionStarted ? (
-            <Whiteboard readOnly={true} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+      {/* Transcript feed */}
+      <div className="vs__feed">
+        <div className="vs__lane">
+          {!sessionStarted && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "var(--mute)", fontSize: 14 }}>
               Configure topic and start a session to begin.
             </div>
           )}
-        </div>
-
-        {/* Transcript sidebar — 40% */}
-        <div className="w-2/5 min-h-0 flex flex-col">
-          <TranscriptSidebar
-            messages={[
-              ...transcriptMessages,
-              ...(streamingRole
-                ? [
-                    {
-                      role: streamingRole,
-                      content: streamingText,
-                      timestamp: new Date(),
-                    } as TranscriptMessage,
-                  ]
-                : []),
-            ]}
-            isStreaming={running}
-          />
-          {error && (
-            <div className="shrink-0 px-4 py-2 text-xs text-destructive bg-destructive/5 border-t border-destructive/20">
-              {error}
-              <button type="button" onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+          {allTurns.map((msg, i) => (
+            <div key={i} className={`vs-turn ${msg.role === "interviewer" ? "t-i" : "t-c"}`}>
+              <div className="gut">
+                <span className="who">{msg.role === "interviewer" ? "Interviewer" : "Candidate"}</span>
+                <span className="num">#{i + 1}</span>
+              </div>
+              <div className="body">{msg.content}</div>
             </div>
+          ))}
+          {error && (
+            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(var(--bad-rgb, 239,68,68), 0.08)", border: "1px solid var(--bad)", color: "var(--bad)", fontSize: 13 }}>
+              {error}
+              <button type="button" onClick={() => setError(null)} style={{ marginLeft: 10, textDecoration: "underline", background: "none", border: 0, color: "inherit", cursor: "pointer" }}>Dismiss</button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div className="vs-bar">
+        <div className="comp">
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textTransform: "uppercase", letterSpacing: ".08em" }}>
+            {sessionId ? `Session #${sessionId}` : "No session"}
+          </span>
+        </div>
+        <div />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {sessionStarted && !ended && (
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textTransform: "uppercase" }}>
+              {allTurns.length} turns
+            </span>
           )}
         </div>
       </div>
