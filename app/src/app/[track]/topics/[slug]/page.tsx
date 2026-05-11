@@ -51,7 +51,7 @@ const CSS = `
 .src-box iframe { display:block; width:100%; height:75vh; border:0; }
 .src-box__docx { padding: 16px; font-size: 13px; color: var(--mute); display:flex; flex-direction:column; gap:6px; }
 .ruler { margin: 24px 0 28px; }
-.ruler__row { display:grid; grid-template-columns: repeat(3, 1fr); position: relative; padding: 10px 0 22px; }
+.ruler__row { display:grid; grid-template-columns: repeat(4, 1fr); position: relative; padding: 10px 0 22px; }
 .ruler__row::before { content:""; position:absolute; left:0; right:0; bottom: 14px; height:1px; background: var(--line); }
 .ruler__tick { display:flex; flex-direction: column; gap:4px; cursor:pointer; padding-right: 18px; position: relative; padding-bottom: 18px; }
 .ruler__k { font-size: 14.5px; font-weight: 500; color: var(--mute); letter-spacing: -0.005em; }
@@ -184,6 +184,7 @@ export default async function TopicPage({
                 { id: 'tldr', k: 'TL;DR', t: '1 min' },
                 { id: 'standard', k: 'Standard', t: '5 min' },
                 { id: 'deep', k: 'Deep', t: '15 min' },
+                ...(topic.pdfPath ? [{ id: 'source', k: 'Source PDF', t: 'pdf' }] : []),
               ].map((tab) => (
                 <Link
                   key={tab.id}
@@ -201,17 +202,15 @@ export default async function TopicPage({
           <div className="td__content">
             {parsed ? (
               <div className="depth-wrap">
-                <DepthTabs
-                  depth={depth}
-                  tldr={<MdxRenderer source={parsed.sections.tldr} />}
-                  standard={<MdxRenderer source={parsed.sections.standard} />}
-                  deep={<MdxRenderer source={parsed.sections.deep} />}
-                />
-                {topic.pdfPath && (
-                  <div style={{ marginTop: 40, paddingTop: 28, borderTop: "1px solid var(--line)" }}>
-                    <SourceCard pdfPath={topic.pdfPath} title={topic.title} />
-                  </div>
-                )}
+                {depth === 'source' && topic.pdfPath
+                  ? <SourceCard pdfPath={topic.pdfPath} title={topic.title} />
+                  : <DepthTabs
+                      depth={depth}
+                      tldr={<MdxRenderer source={parsed.sections.tldr} />}
+                      standard={<MdxRenderer source={parsed.sections.standard} />}
+                      deep={<MdxRenderer source={parsed.sections.deep} />}
+                    />
+                }
               </div>
             ) : (
               <>
