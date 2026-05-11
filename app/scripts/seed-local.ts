@@ -32,6 +32,8 @@ async function main() {
           "Consistent hashing is a distributed hashing scheme that operates independently of the number of servers or objects in a distributed hash table. It allows nodes to be added or removed with minimal reorganization of the key space.",
         mastery: 72,
         generationStatus: "done",
+        mdxPath:
+          "system-design/topics/core-system-design-fundamentals/core-system-design-fundamentals-consistent-hashing.mdx",
       },
       {
         userId: "dev-user",
@@ -45,6 +47,8 @@ async function main() {
           "The CAP theorem states that a distributed system can only guarantee two of the three properties: Consistency, Availability, and Partition tolerance. Understanding the trade-offs is essential for designing distributed databases.",
         mastery: 60,
         generationStatus: "done",
+        mdxPath:
+          "system-design/topics/core-system-design-fundamentals/core-system-design-fundamentals-cap-theorem.mdx",
       },
     ])
     .returning()
@@ -65,6 +69,7 @@ async function main() {
         difficulty: "medium",
         tags: JSON.stringify(["hashing", "databases", "caching"]),
         estMinutes: 30,
+        mdxPath: "system-design/questions/design-url-shortener.mdx",
       },
     ])
     .returning()

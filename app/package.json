@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "setup": "tsx scripts/setup-local.ts",
+    "predev": "tsx scripts/setup-local.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

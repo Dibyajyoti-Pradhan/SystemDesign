@@ -1,0 +1,97 @@
+---
+title: Design a URL shortener at scale
+slug: design-url-shortener
+difficulty: medium
+tags: [hashing, databases, caching, sharding]
+estMinutes: 30
+---
+
+# Design a URL shortener at scale
+
+Build a URL-shortening service like bit.ly. Authenticated users paste a long URL, receive a short opaque slug, and clicks resolve via a fast redirect.
+
+## Functional Requirements
+
+- Given a long URL, return a short slug (≤ 7 characters)
+- Given a short slug, redirect to the original long URL (HTTP 301 or 302)
+- Custom slugs are nice-to-have; random slugs are the default
+- Basic analytics: click count per short URL
+- URLs expire after a configurable TTL (default: never)
+
+## Scale & Non-Functional
+
+- **Write QPS:** ~100M new URLs/day → ~1,200 writes/sec (avg), ~3,600/sec peak
+- **Read QPS:** ~10B redirects/day → ~115,000 reads/sec (avg) — read:write ≈ 100:1
+- **Storage:** 100M URLs/day × 365 days × 5 years = ~180B URLs. Each row ~500 bytes → ~90 TB raw; with index overhead ~150 TB
+- **Slug cardinality:** base62, 7 chars → 62⁷ ≈ 3.5 trillion unique slugs — orders of magnitude above 180B needed
+- **Latency:** redirect p99 < 50ms globally; write p99 < 200ms
+
+## What to Cover
+
+### 1. Capacity Estimation
+
+Put these numbers on the whiteboard first. The 100:1 read amplification immediately tells you the system is read-optimised — caching is the product, not storage.
+
+### 2. Slug Generation Strategy
+
+| Approach | Pros | Cons |
+|---|---|---|
+| Random base62 | Simple, no coordination | Collision probability grows; need retry loop |
+| Hash (MD5/SHA first 7) | Deterministic for same URL | Collisions require disambiguation suffix |
+| Monotonic ID + base62 | Guaranteed unique; sortable; cache-friendly | Reveals write volume; sequential IDs easier to enumerate |
+| Counter per worker | Low coordination | Requires coordination for counter ranges |
+
+**Recommended:** Snowflake-style monotonic ID (41-bit timestamp ms + 10-bit worker ID + 12-bit sequence) encoded in base62. IDs remain unique without central coordination; monotonic IDs cause sequential writes which are friendly to B-tree indexes.
+
+### 3. Storage Schema
+
+```sql
+-- Core table
+CREATE TABLE urls (
+  id         BIGINT PRIMARY KEY,          -- snowflake ID
+  slug       CHAR(7) NOT NULL UNIQUE,     -- base62 encoded id
+  long_url   TEXT NOT NULL,
+  user_id    BIGINT,
+  created_at TIMESTAMP NOT NULL,
+  expires_at TIMESTAMP,
+  clicks     BIGINT DEFAULT 0
+);
+
+-- Index for lookup by slug (this is the hot path)
+CREATE INDEX idx_slug ON urls(slug);
+```
+
+**Partitioning:** Partition by `slug` (consistent hashing across shards). Each shard handles ~1/n of reads. Don't partition by `user_id` — the redirect path doesn't know the user.
+
+### 4. Read-Path Cache Hierarchy
+
+Given 100× read amplification, the cache IS the product:
+
+```
+Client → CDN (edge cache, 301 cached at browser)
+       → App tier → Redis (slug → long_url, TTL = 24h)
+                  → DB shard (fallback, < 1% of traffic)
+```
+
+- Cache hit rate target: 99%+
+- Redis key: `slug:{slug}` → `long_url`
+- On cache miss: read DB, write back to Redis, redirect
+- On write: write to DB, optionally pre-warm cache for expected hot URLs
+
+**Hot-key problem:** viral slugs (tweet from a celebrity) → millions of req/sec to one Redis key. Mitigate with local in-process LRU cache (e.g., 10K entries, 5s TTL) per app server before hitting Redis.
+
+### 5. Failure Mode: 10× Load
+
+First thing to break: **Redis** — either the single-node memory limit or the CPU/network saturation on the hot shard.
+
+Mitigation chain:
+1. Redis Cluster (16,384 hash slots, consistent hashing across nodes)
+2. Read replicas for Redis (redirect reads don't need write replica)
+3. Local in-process cache (eliminates Redis round-trips for top-1000 slugs)
+4. CDN caching for 301s — browser never re-requests; eliminates ~80% of traffic
+
+## Out of Scope
+
+- UI / billing / abuse detection — assume separate teams
+- Link preview metadata (Open Graph) — can be added later
+- Analytics beyond click counts (geo, device breakdown) — requires separate events pipeline
