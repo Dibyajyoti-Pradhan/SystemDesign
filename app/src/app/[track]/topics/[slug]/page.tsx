@@ -177,8 +177,8 @@ export default async function TopicPage({
             </div>
           </div>
 
-          {/* Depth ruler */}
-          <div className="ruler">
+          {/* Depth ruler — only when MDX content exists */}
+          {parsed && <div className="ruler">
             <div className="ruler__row">
               {[
                 { id: 'tldr', k: 'TL;DR', t: '1 min' },
@@ -195,17 +195,23 @@ export default async function TopicPage({
                 </Link>
               ))}
             </div>
-          </div>
+          </div>}
 
           {/* Content */}
           <div className="td__content">
             {parsed ? (
               <div className="depth-wrap">
                 <DepthTabs
+                  depth={depth}
                   tldr={<MdxRenderer source={parsed.sections.tldr} />}
                   standard={<MdxRenderer source={parsed.sections.standard} />}
                   deep={<MdxRenderer source={parsed.sections.deep} />}
                 />
+                {topic.pdfPath && (
+                  <div style={{ marginTop: 40, paddingTop: 28, borderTop: "1px solid var(--line)" }}>
+                    <SourceCard pdfPath={topic.pdfPath} title={topic.title} />
+                  </div>
+                )}
               </div>
             ) : (
               <>
