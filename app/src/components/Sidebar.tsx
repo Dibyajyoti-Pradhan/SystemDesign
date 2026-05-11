@@ -2,17 +2,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Library, BookOpen, Sparkles, Layers } from "lucide-react";
-import { SignOutButton } from "@/components/SignOutButton";
+import {
+  Layers,
+  HelpCircle,
+  Repeat,
+  ScrollText,
+  Network,
+  Notebook,
+  Search,
+} from "lucide-react";
 import { TRACKS, TRACK_LABELS, type Track } from "@/lib/tracks";
-import { cn } from "@/lib/utils";
 
-const NAV: Array<{ slug: "topics" | "questions" | "review" | "cheatsheets"; label: string; icon: any }> = [
-  { slug: "topics", label: "Topics", icon: Library },
-  { slug: "questions", label: "Questions", icon: BookOpen },
-  { slug: "review", label: "Review", icon: Sparkles },
-  { slug: "cheatsheets", label: "Cheatsheets", icon: Layers },
-];
+const NAV_TOP = [
+  { id: "topics",      label: "Topics",      icon: Layers,     slug: "topics" },
+  { id: "questions",   label: "Questions",   icon: HelpCircle, slug: "questions" },
+  { id: "review",      label: "Review",      icon: Repeat,     slug: "review" },
+  { id: "cheatsheets", label: "Cheatsheets", icon: ScrollText, slug: "cheatsheets" },
+] as const;
+
+const NAV_FOOT = [
+  { id: "concept-map", label: "Concept Map", icon: Network,  slug: "concept-map", global: false },
+  { id: "notes",       label: "Notes",       icon: Notebook, slug: "notes",       global: true },
+  { id: "search",      label: "Search",      icon: Search,   slug: "search",      global: true, kbd: "⌘K" },
+] as const;
 
 function activeTrack(pathname: string): Track | null {
   for (const t of TRACKS) {
@@ -21,58 +33,82 @@ function activeTrack(pathname: string): Track | null {
   return null;
 }
 
+function activeId(pathname: string, track: Track | null): string {
+  if (!track) return "";
+  for (const n of NAV_TOP) {
+    const href = `/${track}/${n.slug}`;
+    if (pathname === href || pathname.startsWith(`${href}/`)) return n.id;
+  }
+  for (const n of NAV_FOOT) {
+    const href = n.global ? `/${n.slug}` : `/${track}/${n.slug}`;
+    if (pathname === href || pathname.startsWith(`${href}/`)) return n.id;
+  }
+  return "";
+}
+
 export function Sidebar() {
   const pathname = usePathname();
-  const track = activeTrack(pathname);
+  const track = activeTrack(pathname) ?? "system-design";
+  const active = activeId(pathname, track);
 
   return (
-    <aside className="w-56 shrink-0 border-r bg-muted/20 h-screen sticky top-0">
-      <div className="p-5 border-b">
-        <Link href={track ? `/${track}` : "/"} className="block">
-          <div className="text-base font-semibold tracking-tight">Career Lab</div>
-        </Link>
+    <aside className="sb">
+      <div className="sb__brand">
+        <div className="sb__mark" />
+        <div className="sb__name">Career Lab</div>
+        <div className="sb__ver">v0.4</div>
       </div>
 
-      <div className="p-2 border-b">
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-md bg-muted/40">
-          {TRACKS.map((t) => (
-            <Link
-              key={t}
-              href={`/${t}`}
-              className={cn(
-                "text-center text-xs font-medium py-1.5 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                t === track ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {TRACK_LABELS[t]}
-            </Link>
-          ))}
-        </div>
+      <div className="track" role="tablist" aria-label="Track">
+        {TRACKS.map((t) => (
+          <Link
+            key={t}
+            href={`/${t}`}
+            className={`track__pill${t === track ? " is-on" : ""}`}
+          >
+            {TRACK_LABELS[t]}
+          </Link>
+        ))}
       </div>
 
-      <nav className="p-2">
-        {track && NAV.map((item) => {
-          const Icon = item.icon;
-          const href = `/${track}/${item.slug}`;
-          const isActive = pathname === href || pathname.startsWith(`${href}/`);
+      <nav className="nav">
+        <div className="nav__group">Study</div>
+        {NAV_TOP.map((n) => {
+          const Icon = n.icon;
+          const href = `/${track}/${n.slug}`;
           return (
             <Link
-              key={item.slug}
+              key={n.id}
               href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                isActive ? "bg-accent text-foreground" : "text-foreground hover:bg-accent",
-              )}
+              className={`nav__item${active === n.id ? " is-on" : ""}`}
             >
-              <Icon className="h-4 w-4 text-muted-foreground" />
-              <span>{item.label}</span>
+              <Icon className="nav__icon" style={{ width: 14, height: 14 }} />
+              <span>{n.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      <div className="mt-auto p-4 border-t">
-        <SignOutButton />
+      <div className="sb__foot">
+        {NAV_FOOT.map((n) => {
+          const Icon = n.icon;
+          const href = n.global ? `/${n.slug}` : `/${track}/${n.slug}`;
+          return (
+            <Link
+              key={n.id}
+              href={href}
+              className={`nav__item${active === n.id ? " is-on" : ""}`}
+            >
+              <Icon className="nav__icon" style={{ width: 14, height: 14 }} />
+              <span>{n.label}</span>
+              {"kbd" in n && n.kbd && (
+                <span className="nav__count" style={{ fontSize: 10 }}>
+                  {n.kbd}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </aside>
   );

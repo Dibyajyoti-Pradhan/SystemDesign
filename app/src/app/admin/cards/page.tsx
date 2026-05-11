@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { db } from "@/db/client";
-import { cards, topics, FREE_FOREVER_EMAIL } from "@/db/schema";
+import { cards, topics } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,10 +39,6 @@ async function editCard(formData: FormData) {
 }
 
 export default async function AdminCardsPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/sign-in");
-  if (session.user.email !== FREE_FOREVER_EMAIL) redirect("/");
-
   const rows = await db
     .select({
       id: cards.id,

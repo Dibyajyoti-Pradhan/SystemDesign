@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
+import { redirect } from "next/navigation";
 
-export default function SignUpPage() {
-  redirect('/sign-in')
+export default function Page() {
+  redirect("/system-design/topics");
 }
