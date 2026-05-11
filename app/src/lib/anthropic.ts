@@ -1,10 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import * as cli from "./claude-cli";
 
-// When ANTHROPIC_API_KEY is absent (local dev), delegate to the claude CLI
-// so devs can use their Pro/Max subscription without a separate API key.
-// In production, ANTHROPIC_API_KEY must be set and the SDK path is always used.
-const useCli = () => !process.env.ANTHROPIC_API_KEY;
+// In development, always use the local claude CLI (Pro/Max subscription auth).
+// In production, ANTHROPIC_API_KEY must be set and the SDK path is used.
+const useCli = () =>
+  process.env.NODE_ENV === "development" || !process.env.ANTHROPIC_API_KEY;
 
 export class ClaudeCliError extends Error {
   constructor(message: string, public stderr?: string, public exitCode?: number | null) {
