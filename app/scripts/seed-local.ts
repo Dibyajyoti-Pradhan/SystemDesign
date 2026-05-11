@@ -171,7 +171,6 @@ function seedDemoCards() {
     "core-system-design-fundamentals-cap-theorem": 88,
     "core-system-design-fundamentals-consistency-models": 72,
     "core-system-design-fundamentals-caching": 78,
-    "core-system-design-fundamentals-consistent-hashing": 72,
     "core-system-design-fundamentals-scalability": 81,
     "core-system-design-fundamentals-availability": 65,
     "core-system-design-fundamentals-replication": 54,
@@ -184,29 +183,6 @@ function seedDemoCards() {
   }
 
   const cardDefs = [
-    {
-      slug: "core-system-design-fundamentals-consistent-hashing",
-      items: [
-        {
-          type: "definition" as const,
-          front: "What is consistent hashing?",
-          back: "A hashing technique where keys and nodes share a ring. Adding/removing a node only remaps ~1/n keys — not the whole keyspace.",
-          dueAt: d1, ease: 2.5, intervalDays: 1, repetitions: 1,
-        },
-        {
-          type: "tradeoff" as const,
-          front: "What problem do virtual nodes solve in consistent hashing?",
-          back: "Non-uniform load. Without vnodes one server may own 40% of keys. With 150+ vnodes variance drops to O(1/√vnodes).",
-          dueAt: d2, ease: 2.6, intervalDays: 2, repetitions: 2,
-        },
-        {
-          type: "scenario" as const,
-          front: "When would you use consistent hashing in a design?",
-          back: "Distributed caches (Redis Cluster, Memcached), Cassandra token ring, CDN PoP selection, sticky load balancers.",
-          dueAt: now, ease: 2.4, intervalDays: 1, repetitions: 1,
-        },
-      ],
-    },
     {
       slug: "core-system-design-fundamentals-cap-theorem",
       items: [
