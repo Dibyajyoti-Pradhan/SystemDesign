@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect } from "react";
 import {
   Layers,
   HelpCircle,
@@ -48,8 +49,20 @@ function activeId(pathname: string, track: Track | null): string {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const track = activeTrack(pathname) ?? "system-design";
   const active = activeId(pathname, track);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        router.push("/search");
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
 
   return (
     <aside className="sb">

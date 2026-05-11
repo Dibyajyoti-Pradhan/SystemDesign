@@ -6,6 +6,13 @@ import { asc, eq, inArray, and, isNotNull } from "drizzle-orm";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 import { LanguageFilter } from "@/components/LanguageFilter";
 
+export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
+  const { track } = await params;
+  const label = track === "coding" ? "Coding" : "System Design";
+  return { title: label + " Questions" };
+}
+
+
 export default async function QuestionsPage({
   params,
   searchParams,

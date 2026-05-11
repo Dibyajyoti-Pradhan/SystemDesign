@@ -6,6 +6,13 @@ import { and, asc, eq, isNotNull } from "drizzle-orm";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 import { LanguageFilter } from "@/components/LanguageFilter";
 
+export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
+  const { track } = await params;
+  const label = track === "coding" ? "Coding" : "System Design";
+  return { title: label + " Topics" };
+}
+
+
 const CSS = `
 .tl { height:100%; overflow:auto; }
 .tl__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
@@ -23,7 +30,7 @@ const CSS = `
 .grp__n { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute-2); text-transform: uppercase; letter-spacing: .1em; }
 .grp__avg { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; }
 .grp__avg b { color: var(--accent); font-weight: 500; }
-.tl__row { display:grid; grid-template-columns: 32px 1fr 110px 80px 24px; gap: 18px; padding: 16px 6px 16px 0; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; text-decoration: none; color: inherit; }
+.tl__row { display:grid; grid-template-columns: 32px 1fr 110px 24px; gap: 18px; padding: 16px 6px 16px 0; border-bottom: 1px solid var(--line); align-items: center; cursor: pointer; text-decoration: none; color: inherit; }
 .tl__row:hover { background: var(--bg-2); }
 .row__n { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); padding-left: 6px; }
 .row__main { display:flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -121,8 +128,9 @@ export default async function TopicsPage({
         )}
 
         {grouped.size === 0 && (
-          <div style={{ padding: "48px 0", textAlign: "center", color: "var(--mute)", fontSize: "14px" }}>
-            No topics yet — upload a PDF to get started.
+          <div style={{ padding: "56px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            <div style={{ fontFamily: "var(--font-read)", fontSize: 32, fontStyle: "italic", color: "var(--mute)", letterSpacing: "-0.02em" }}>No topics yet.</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--mute-2)" }}>Run <code>npm run dev</code> to seed the database from source files.</div>
           </div>
         )}
 
@@ -165,7 +173,6 @@ export default async function TopicsPage({
                       </div>
                       <span className="row__pct">{t.mastery}%</span>
                     </div>
-                    <span className="row__cards">—</span>
                     <span className="row__chev">›</span>
                   </Link>
                 );

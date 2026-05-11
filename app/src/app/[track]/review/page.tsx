@@ -6,6 +6,13 @@ import { and, eq, lte, asc, desc, isNull, or } from "drizzle-orm";
 import { ReviewSession, type ReviewCard } from "@/components/srs/ReviewSession";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 
+export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
+  const { track } = await params;
+  const label = track === "coding" ? "Coding" : "System Design";
+  return { title: label + " Review" };
+}
+
+
 export const dynamic = "force-dynamic";
 
 export default async function ReviewPage({

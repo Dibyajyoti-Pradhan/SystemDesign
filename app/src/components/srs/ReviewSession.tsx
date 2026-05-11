@@ -159,7 +159,7 @@ export function ReviewSession({
               ))}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn" onClick={() => router.refresh()}>Refresh queue</button>
+              <Link href={`/${track}/review`} className="btn">Review more</Link>
               <Link href={`/${track}/topics`} className="btn btn--ghost">Back to topics</Link>
             </div>
           </div>
@@ -227,7 +227,12 @@ export function ReviewSession({
           <Link href={`/${track}/topics`}>
             <ArrowLeft style={{ width: 12, height: 12 }} /> Exit session
           </Link>
-          <span>A {stats.again} · H {stats.hard} · G {stats.good} · E {stats.easy}</span>
+          <span style={{ display: "flex", gap: 10 }}>
+            <span>Again <b style={{ color: "var(--ink)" }}>{stats.again}</b></span>
+            <span>Hard <b style={{ color: "var(--ink)" }}>{stats.hard}</b></span>
+            <span>Good <b style={{ color: "var(--ink)" }}>{stats.good}</b></span>
+            <span>Easy <b style={{ color: "var(--ink)" }}>{stats.easy}</b></span>
+          </span>
         </div>
       </div>
     </>

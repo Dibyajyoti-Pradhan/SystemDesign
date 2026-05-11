@@ -6,6 +6,13 @@ import { count, eq, lte, and, desc, isNotNull } from "drizzle-orm";
 import { relativeTime } from "@/lib/utils";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 
+export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
+  const { track } = await params;
+  const label = track === "coding" ? "Coding" : "System Design";
+  return { title: label + " Dashboard" };
+}
+
+
 const CSS = `
 .hm { height:100%; overflow:auto; }
 .hm__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
@@ -14,7 +21,7 @@ const CSS = `
 .hm__h { font-family: var(--font-ui); font-size: 38px; font-weight: 600; letter-spacing: -0.028em; line-height: 1.05; }
 .hm__h em { font-family: var(--font-read); font-style: italic; font-weight: 400; color: var(--accent-2); }
 .hm__sub { color: var(--mute); font-size: 15px; margin-top: 12px; max-width: 56ch; line-height: 1.55; }
-.hm__stats { display:grid; grid-template-columns: repeat(3, auto); gap: 32px; padding: 4px 0 6px; }
+.hm__stats { display:grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding: 4px 0 6px; }
 .stat { display:flex; flex-direction: column; gap: 2px; }
 .stat__n { font-family: var(--font-read); font-style: italic; font-weight: 400; font-size: 36px; line-height: 1; letter-spacing: -0.02em; }
 .stat__l { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; margin-top: 4px; }
@@ -44,6 +51,13 @@ function getGreeting() {
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
+}
+
+function getPlanLabel() {
+  const h = new Date().getHours();
+  if (h < 12) return "Morning plan";
+  if (h < 17) return "Today’s plan";
+  return "Evening review";
 }
 
 export default async function TrackHome({
@@ -126,6 +140,7 @@ export default async function TrackHome({
 
   const trackLabel = TRACK_LABELS[track];
   const greeting = getGreeting();
+  const planLabel = getPlanLabel();
 
   return (
     <div className="hm">
@@ -165,7 +180,7 @@ export default async function TrackHome({
           {/* Left: Tonight's plan */}
           <div className="blk">
             <div className="blk__h">
-              <span className="lbl">Tonight&apos;s plan</span>
+              <span className="lbl">{planLabel}</span>
             </div>
             <div className="plan">
               <Link href={`/${track}/review`} className="plan__item">

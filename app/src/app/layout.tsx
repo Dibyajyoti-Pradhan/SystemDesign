@@ -4,8 +4,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { AssistantPanel } from "@/components/AssistantPanel";
 
 export const metadata: Metadata = {
-  title: "CareerLab — AI System Design Interview Prep",
-  description: "AI voice interviewer + live whiteboard + real-time feedback.",
+  title: { default: "CareerLab", template: "%s · CareerLab" },
+  description: "AI-powered interview prep — system design, coding, spaced repetition.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

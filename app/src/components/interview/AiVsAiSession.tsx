@@ -377,7 +377,7 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
 
         {/* Turn budget stave */}
         <div className="stave">
-          <span className="stave__lbl">Turn budget</span>
+          <span className="stave__lbl">Turns <em style={{ fontStyle: "normal", color: "var(--mute-2)", fontFamily: "var(--font-mono)", fontSize: 9 }}>soft {SOFT_CAP} · hard {HARD_CAP}</em></span>
           <div className="stave__bar">
             {Array.from({ length: HARD_CAP }).map((_, i) => {
               let cls = "";
@@ -501,7 +501,7 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
               value={steerText}
               onChange={(e) => setSteerText(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleInjectSteer(); }}
-              placeholder='Inject instruction… e.g. "ask about geo replication"'
+              placeholder='Steer the conversation… e.g. "push back on caching" (⌘↵ to send)'
             />
             <button className="vs-comp__send" onClick={handleInjectSteer} disabled={!steerText.trim()} title="Inject (⌘↵)">
               <Send size={14} />
@@ -510,7 +510,7 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
 
           {/* End & grade */}
           <button className="vs-endbtn" onClick={handleEnd} disabled={grading || turnCount < 2}>
-            {grading ? "Grading…" : "∑ End & grade"}
+            {grading ? "Grading…" : "End & grade"}
           </button>
         </div>
       )}

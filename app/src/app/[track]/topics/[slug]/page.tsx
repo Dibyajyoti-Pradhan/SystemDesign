@@ -184,7 +184,7 @@ export default async function TopicPage({
                 { id: 'tldr', k: 'TL;DR', t: '1 min' },
                 { id: 'standard', k: 'Standard', t: '5 min' },
                 { id: 'deep', k: 'Deep', t: '15 min' },
-                ...(topic.pdfPath ? [{ id: 'source', k: 'Source PDF', t: 'pdf' }] : []),
+                ...(topic.pdfPath ? [{ id: 'source', k: 'Source', t: 'pdf' }] : []),
               ].map((tab) => (
                 <Link
                   key={tab.id}
