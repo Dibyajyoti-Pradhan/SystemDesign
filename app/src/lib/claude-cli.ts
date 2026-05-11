@@ -75,9 +75,12 @@ function buildArgs(opts: ClaudeRunOptions, format: "json" | "stream-json" | "tex
 
 function spawnClaude(args: string[], cwd?: string): ChildProcessWithoutNullStreams {
   try {
+    // Strip ANTHROPIC_API_KEY so the CLI uses its stored OAuth session rather
+    // than trying to authenticate with a key that may be absent or invalid.
+    const { ANTHROPIC_API_KEY: _, ...cleanEnv } = process.env;
     return spawn("claude", args, {
       cwd: cwd ?? process.cwd(),
-      env: process.env,
+      env: cleanEnv,
       stdio: ["pipe", "pipe", "pipe"],
     });
   } catch (e: any) {
