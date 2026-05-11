@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
+import Credentials from 'next-auth/providers/credentials'
 import { db } from '@/db/client'
 import { users, FREE_FOREVER_EMAIL } from '@/db/schema'
 import { eq } from 'drizzle-orm'
@@ -7,12 +8,27 @@ import logger from '@/lib/logger'
 import { track } from '@/lib/analytics'
 import { sendWelcomeEmail } from '@/lib/email'
 
+const isDev = process.env.NODE_ENV === 'development'
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
       clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
     }),
+    // Dev-only: sign in with any email + password "dev" — no OAuth needed locally.
+    ...(isDev ? [Credentials({
+      name: 'Dev Login',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password (type "dev")', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (credentials?.password !== 'dev') return null
+        const email = String(credentials.email || 'dev@careerlab.local')
+        return { id: `dev-${email}`, email, name: 'Dev User' }
+      },
+    })] : []),
   ],
   session: { strategy: 'jwt' },
   callbacks: {
