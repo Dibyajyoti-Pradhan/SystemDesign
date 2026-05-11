@@ -53,7 +53,7 @@ export function GenerateTopicButton({ slug }: { slug: string }) {
       {error && (
         <span style={{ fontSize: 12, color: "var(--bad)" }}>Generation failed: {error}</span>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
     </div>
   );
 }

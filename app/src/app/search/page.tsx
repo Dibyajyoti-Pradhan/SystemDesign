@@ -10,7 +10,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .sr { height:100%; overflow:auto; }
         .sr__inner { max-width: 880px; margin: 0 auto; padding: 28px 28px 64px; }
         .sr__input { display:flex; align-items: center; gap: 12px; padding: 14px 18px; background: var(--bg-2); border:1px solid var(--line-2); border-radius: 10px; }
@@ -33,7 +33,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         .sr__hint { display:flex; align-items: center; gap: 14px; padding: 18px 4px; margin-top: 18px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; color: var(--mute); }
         .sr__hint span { display:flex; align-items: center; gap: 6px; }
         .sr__empty { padding: 48px 0; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
-      `}</style>
+      ` }} />
       <div className="sr">
         <div className="sr__inner">
           <form className="sr__input">

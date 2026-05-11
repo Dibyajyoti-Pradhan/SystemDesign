@@ -135,7 +135,7 @@ export function ReviewSession({
   if (done) {
     return (
       <>
-        <style>{CSS}</style>
+        <style dangerouslySetInnerHTML={{ __html: CSS }} />
         <div className="card-wrap">
           <div className="srs-done">
             <div className="srs-done__t">Session complete.</div>
@@ -164,7 +164,7 @@ export function ReviewSession({
 
   return (
     <>
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="card-wrap">
         <div className="srs-card">
           <div className="srs-card__meta">

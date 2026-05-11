@@ -54,7 +54,7 @@ export default async function QuestionsPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .ql { height:100%; overflow:auto; }
         .ql__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
         .ql__head { display:flex; align-items: end; gap: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
@@ -78,7 +78,7 @@ export default async function QuestionsPage({
         .qr__score em { color: var(--mute-2); font-style: normal; }
         .qr__score.none { color: var(--accent); }
         .ql__lang-filter { padding: 16px 0 4px; }
-      `}</style>
+      ` }} />
       <div className="ql">
         <div className="ql__inner">
           <div className="ql__head">

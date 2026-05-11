@@ -30,7 +30,7 @@ export default async function ConceptMapPage() {
 
   return (
     <div className="cm-wrap">
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="cm__hud">
         <div className="cm__title">
           <b>Concept map</b>

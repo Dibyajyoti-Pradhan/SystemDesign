@@ -139,7 +139,7 @@ export default async function TopicPage({
 
   return (
     <div className="td">
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       {/* Left column: main content */}
       <div className="td__col">

@@ -90,7 +90,7 @@ export default async function AdminCardsPage() {
 
   return (
     <div className="aq">
-      <style>{AQ_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: AQ_CSS }} />
       <div className="aq__inner">
         <div className="aq__head">
           <div>

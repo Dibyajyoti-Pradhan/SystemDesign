@@ -88,7 +88,7 @@ export default async function TopicsPage({
 
   return (
     <div className="tl">
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="tl__inner">
         {/* Header */}
         <div className="tl__head">

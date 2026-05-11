@@ -101,7 +101,7 @@ export default async function InterviewSessionPage({
     const sectionKeys = Object.keys(SECTION_LABELS) as Array<keyof RubricData["sections"]>;
     return (
       <>
-        <style>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .rub { height:100%; overflow:auto; background: var(--bg); }
           .rub__inner { max-width: 1080px; margin: 0 auto; padding: 36px 36px 64px; }
           .rub__head { display:grid; grid-template-columns: 1fr auto; gap: 32px; align-items: end; padding-bottom: 26px; border-bottom: 1px solid var(--line); }
@@ -141,7 +141,7 @@ export default async function InterviewSessionPage({
           .tx-msg:last-child { border-bottom: 0; }
           .tx-msg__who { font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
           .tx-msg__body { font-size: 13.5px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
-        `}</style>
+        ` }} />
         <div className="rub">
           <div className="rub__inner">
             {/* Header */}

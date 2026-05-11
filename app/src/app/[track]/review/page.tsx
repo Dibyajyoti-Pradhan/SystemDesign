@@ -69,12 +69,12 @@ export default async function ReviewPage({
   if (queue.length === 0) {
     return (
       <>
-        <style>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           .srd { height: 100%; display: grid; place-items: center; padding: 40px; }
           .srd__inner { max-width: 580px; text-align: center; display:flex; flex-direction: column; align-items: center; gap: 18px; }
           .srd__t { font-family: var(--font-read); font-style: italic; font-weight: 400; font-size: 56px; letter-spacing: -0.024em; line-height: 1.05; color: var(--ink); }
           .srd__sub { font-family: var(--font-read); font-size: 18px; color: var(--mute); line-height: 1.55; max-width: 44ch; }
-        `}</style>
+        ` }} />
         <div className="srd">
           <div className="srd__inner">
             <div className="srd__t">All caught up.</div>
@@ -97,7 +97,7 @@ export default async function ReviewPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .srs-wrap { height:100%; display:grid; grid-template-rows: auto 1fr; background: var(--bg); }
         .srs-top { padding: 16px 32px 0; display:flex; align-items: center; gap: 14px; }
         .srs-count { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
@@ -105,7 +105,7 @@ export default async function ReviewPage({
         .srs-bar { flex:1; height: 2px; background: var(--surf-3); border-radius: 999px; overflow: hidden; max-width: 520px; }
         .srs-bar > i { display:block; height:100%; background: var(--accent); }
         .srs-main { padding: 24px 32px; overflow:auto; }
-      `}</style>
+      ` }} />
       <div className="srs-wrap">
         <div className="srs-top">
           <div className="srs-count">

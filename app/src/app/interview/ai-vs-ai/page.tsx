@@ -232,7 +232,7 @@ export default function AiVsAiPage() {
 
   return (
     <div className="vsai">
-      <style>{VSAI_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: VSAI_CSS }} />
 
       {/* Header / meta */}
       <div className="vs__meta">

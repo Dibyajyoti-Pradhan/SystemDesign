@@ -65,7 +65,7 @@ export default async function NotesPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .nt { height:100%; overflow:auto; }
         .nt__inner { max-width: 880px; margin: 0 auto; padding: 36px 28px 64px; }
         .nt__head { display:flex; align-items: end; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
@@ -84,7 +84,7 @@ export default async function NotesPage({
         .nrow__w { font-family: var(--font-mono); font-size: 10.5px; color: var(--mute-2); text-align: right; padding-top: 4px; }
         .nt__compose-wrap { margin-top: 26px; padding-bottom: 4px; }
         .nt__empty { padding: 48px 0; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
-      `}</style>
+      ` }} />
       <div className="nt">
         <div className="nt__inner">
           <div className="nt__head">

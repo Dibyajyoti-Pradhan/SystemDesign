@@ -52,7 +52,7 @@ export function GenerateBriefButton({ slug }: { slug: string }) {
       {error && (
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--bad)" }}>{error}</span>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
     </div>
   );
 }

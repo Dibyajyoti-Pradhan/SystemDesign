@@ -51,7 +51,7 @@ export default async function CheatsheetPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .csd { height:100%; display:grid; grid-template-columns: 1fr 200px; overflow:hidden; }
         .csd__col { overflow:auto; }
         .csd__inner { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
@@ -73,7 +73,7 @@ export default async function CheatsheetPage({
         .csd__nav-btn:hover { border-color: var(--line-2); background: var(--surf-2); }
         .csd__nav-btn .dir { font-family: var(--font-mono); font-size: 9px; color: var(--mute-2); text-transform: uppercase; letter-spacing: .12em; }
         .csd__nav-btn .lbl { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      `}</style>
+      ` }} />
       <div className="csd">
         <div className="csd__col">
           <div className="csd__inner">

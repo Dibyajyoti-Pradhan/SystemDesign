@@ -129,7 +129,7 @@ export default async function TrackHome({
 
   return (
     <div className="hm">
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <div className="hm__inner">
         {/* Hero */}
         <div className="hm__hero">

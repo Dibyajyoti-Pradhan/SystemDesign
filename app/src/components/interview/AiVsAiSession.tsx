@@ -348,7 +348,7 @@ export function AiVsAiSession({ sessionId, questionTitle, initialTranscript, ini
 
   return (
     <div className="vsai">
-      <style>{CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       {/* ── Meta strip ── */}
       <div className="vs__meta">

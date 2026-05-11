@@ -49,7 +49,7 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="adm">
-      <style>{ADMIN_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: ADMIN_CSS }} />
       <div className="adm__inner">
         <div className="adm__head">
           <div>

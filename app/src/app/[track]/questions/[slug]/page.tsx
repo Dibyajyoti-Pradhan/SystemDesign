@@ -70,7 +70,7 @@ export default async function QuestionDetailPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .qd { height:100%; overflow:auto; }
         .qd__inner { max-width: 920px; margin: 0 auto; padding: 36px 36px 64px; display:flex; flex-direction: column; gap: 28px; }
         .qd__head { display:flex; flex-direction: column; gap:12px; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
@@ -104,7 +104,7 @@ export default async function QuestionDetailPage({
         .qd__back { display:inline-flex; align-items:center; gap:6px; font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-decoration:none; text-transform:uppercase; letter-spacing:.08em; }
         .qd__back:hover { color: var(--ink); }
         .qd__brief-placeholder { font-family: var(--font-read); font-size: 15px; color: var(--mute); font-style: italic; }
-      `}</style>
+      ` }} />
       <div className="qd">
         <div className="qd__inner">
 

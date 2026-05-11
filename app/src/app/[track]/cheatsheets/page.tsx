@@ -39,7 +39,7 @@ export default async function CheatsheetsPage({
 
   return (
     <>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .cs { height:100%; overflow:auto; }
         .cs__inner { max-width: 920px; margin: 0 auto; padding: 36px 36px 64px; }
         .cs__head { display:flex; align-items:end; gap:24px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
@@ -57,7 +57,7 @@ export default async function CheatsheetsPage({
         .row__chev { color: var(--mute-2); display:flex; justify-content:center; }
         .cs__row:hover .row__chev { color: var(--ink); }
         .cs__empty { padding: 60px 0; text-align: center; font-family: var(--font-mono); font-size: 12px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
-      `}</style>
+      ` }} />
       <div className="cs">
         <div className="cs__inner">
           <div className="cs__head">
