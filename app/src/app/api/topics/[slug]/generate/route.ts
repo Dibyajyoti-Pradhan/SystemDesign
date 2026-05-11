@@ -10,6 +10,7 @@ import { claudeRun } from "@/lib/anthropic";
 import { REPO_ROOT, CONTENT_ROOT, TRACK_PATHS } from "@/lib/paths";
 import { slugify } from "@/lib/utils";
 import { extractSourceText } from "@/lib/sourceExtract";
+import { enqueueContentJob } from "@/lib/queue";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,8 +63,9 @@ Rules:
 const SYSTEM_PROMPT = loadPrompt("topic-generate.txt", SYSTEM_PROMPT_FALLBACK);
 
 export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: string }> }) {
+  let userId: string;
   try {
-    await requireUser();
+    userId = await requireUser();
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -84,6 +86,22 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ slug: str
     return NextResponse.json({ error: "Topic has no source PDF" }, { status: 400 });
   }
 
+  // ---------------------------------------------------------------------------
+  // Attempt to enqueue the job asynchronously via BullMQ.
+  // Falls back to inline execution when Redis is not configured (dev / CI).
+  // ---------------------------------------------------------------------------
+  const jobId = await enqueueContentJob("topic", slug, userId);
+
+  if (jobId !== null) {
+    // Job successfully queued — return immediately so the HTTP request doesn't
+    // hang for the 2-4 minutes Claude takes.
+    await db.update(topics).set({ generationStatus: "pending" }).where(eq(topics.id, topic.id));
+    return NextResponse.json({ ok: true, queued: true, jobId });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Fallback: inline generation (no Redis configured)
+  // ---------------------------------------------------------------------------
   const sourceAbs = path.join(REPO_ROOT, topic.pdfPath);
   const pdfText = await extractSourceText(sourceAbs);
 

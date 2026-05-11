@@ -1,21 +1,36 @@
 import { db } from "@/db/client";
 import { topics } from "@/db/schema";
 import { asc } from "drizzle-orm";
+import { getContentQueue } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
 
+async function getQueueCounts(): Promise<{ waiting: number; active: number } | null> {
+  try {
+    const queue = await getContentQueue();
+    if (!queue) return null;
+    const counts = await queue.getJobCounts("waiting", "active");
+    return { waiting: counts.waiting ?? 0, active: counts.active ?? 0 };
+  } catch {
+    return null;
+  }
+}
+
 export default async function AdminDashboardPage() {
-  const rows = await db
-    .select({
-      id: topics.id,
-      slug: topics.slug,
-      title: topics.title,
-      generatedAt: topics.generatedAt,
-      version: topics.version,
-      generationStatus: topics.generationStatus,
-    })
-    .from(topics)
-    .orderBy(asc(topics.categoryOrder), asc(topics.topicOrder), asc(topics.id));
+  const [rows, queueCounts] = await Promise.all([
+    db
+      .select({
+        id: topics.id,
+        slug: topics.slug,
+        title: topics.title,
+        generatedAt: topics.generatedAt,
+        version: topics.version,
+        generationStatus: topics.generationStatus,
+      })
+      .from(topics)
+      .orderBy(asc(topics.categoryOrder), asc(topics.topicOrder), asc(topics.id)),
+    getQueueCounts(),
+  ]);
 
   return (
     <div className="max-w-7xl mx-auto p-8 space-y-6">
@@ -23,6 +38,27 @@ export default async function AdminDashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Topics</h1>
         <p className="text-muted-foreground mt-1">{rows.length} topics in the database</p>
       </header>
+
+      {/* Queue depth panel */}
+      <div className="rounded-md border p-4 bg-muted/20">
+        <h2 className="text-sm font-semibold mb-2">Job Queue</h2>
+        {queueCounts === null ? (
+          <p className="text-sm text-muted-foreground">
+            Queue unavailable — set UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN to enable.
+          </p>
+        ) : (
+          <div className="flex gap-6 text-sm">
+            <span>
+              <span className="font-medium text-yellow-600 dark:text-yellow-400">{queueCounts.waiting}</span>{" "}
+              waiting
+            </span>
+            <span>
+              <span className="font-medium text-blue-600 dark:text-blue-400">{queueCounts.active}</span>{" "}
+              active
+            </span>
+          </div>
+        )}
+      </div>
 
       <div className="rounded-md border overflow-x-auto">
         <table className="w-full text-sm min-w-[600px]">
@@ -64,11 +100,6 @@ export default async function AdminDashboardPage() {
                 </td>
               </tr>
             ))}
-            <tr className="bg-muted/20">
-              <td colSpan={5} className="px-4 py-3 text-sm text-muted-foreground">
-                Queue: N/A — Redis not configured
-              </td>
-            </tr>
           </tbody>
         </table>
       </div>
