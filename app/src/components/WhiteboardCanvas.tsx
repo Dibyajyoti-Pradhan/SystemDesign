@@ -285,10 +285,20 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   }, [selectedId]);
 
   const [textEdit, setTextEdit] = useState<TextEditState | null>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const [, setRenderTick] = useState(0);
   const requestRedraw = useCallback(() => {
     setRenderTick((t) => (t + 1) & 0x3fffffff);
   }, []);
+
+  // Focus the text input whenever it mounts — more reliable than autoFocus.
+  useEffect(() => {
+    if (textEdit) {
+      // rAF so the input is fully in the DOM before we focus.
+      const id = requestAnimationFrame(() => textInputRef.current?.focus());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [textEdit]);
 
   // Canvas pixel size tracking (for HiDPI).
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
@@ -768,11 +778,11 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   // ---------------------------------------------------------------------
   // Text edit overlay
   // ---------------------------------------------------------------------
-  const commitText = useCallback(() => {
+  const commitText = useCallback((dismissIfEmpty = false) => {
     if (!textEdit) return;
-    const trimmed = textEdit.value;
+    const trimmed = textEdit.value.trim();
     if (trimmed.length === 0) {
-      setTextEdit(null);
+      if (dismissIfEmpty) setTextEdit(null);
       return;
     }
     const el: TextElement = {
@@ -1013,20 +1023,20 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
         />
         {textEdit && (
           <input
-            autoFocus
+            ref={textInputRef}
             type="text"
             value={textEdit.value}
             onChange={(e) => setTextEdit({ ...textEdit, value: e.target.value })}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                commitText();
+                commitText(true);
               } else if (e.key === "Escape") {
                 e.preventDefault();
                 setTextEdit(null);
               }
             }}
-            onBlur={commitText}
+            onBlur={() => commitText(true)}
             style={textInputStyle}
           />
         )}
