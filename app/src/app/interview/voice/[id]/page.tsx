@@ -45,12 +45,10 @@ export default async function VoiceInterviewPage({
   );
 
   return (
-    <div style={{ height: "100%", overflow: "hidden" }}>
-      <VoiceInterviewSession
-        sessionId={session.id}
-        questionTitle={question.title}
-        firstInterviewerMessage={openingMessage}
-      />
-    </div>
+    <VoiceInterviewSession
+      sessionId={session.id}
+      questionTitle={question.title}
+      firstInterviewerMessage={openingMessage}
+    />
   );
 }

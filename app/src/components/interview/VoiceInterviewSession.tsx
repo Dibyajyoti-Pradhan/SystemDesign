@@ -248,94 +248,89 @@ export function VoiceInterviewSession({
   };
 
   const combinedError = error ?? sttError;
+  const micDisabled = status === "thinking" || status === "speaking";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", background: "var(--bg)" }}>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .vi-bar { display:flex; align-items:center; gap:12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg); flex-shrink:0; }
-        .vi-logo { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .12em; }
-        .vi-qtitle { flex:1; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .vi-body { display:flex; flex:1; min-height:0; }
-        .vi-wb { flex:1; min-height:0; min-width:0; }
-        .vi-sidebar { width: 320px; flex-shrink:0; display:flex; flex-direction:column; border-left: 1px solid var(--line); background: var(--bg); }
-        .vi-tx { flex:1; overflow-y:auto; padding: 16px; display:flex; flex-direction:column; gap: 10px; min-height:0; }
-        .vi-tx-msg { display:flex; flex-direction:column; gap:3px; }
-        .vi-tx-msg.iv { align-items: flex-start; }
-        .vi-tx-msg.cd { align-items: flex-end; }
-        .vi-tx-who { font-family: var(--font-mono); font-size: 9.5px; color: var(--mute); text-transform: uppercase; letter-spacing: .1em; }
-        .vi-tx-bubble { max-width: 90%; border-radius: 10px; padding: 8px 12px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
-        .vi-tx-bubble.iv { background: var(--surf); color: var(--ink); border-top-left-radius: 3px; }
-        .vi-tx-bubble.cd { background: var(--accent); color: #fff; border-top-right-radius: 3px; }
-        .vi-tx-interim { font-size: 12px; color: var(--mute); font-style: italic; padding: 4px 12px; }
-        .vi-strip { display:flex; align-items:center; gap:12px; padding: 12px 16px; border-top: 1px solid var(--line); flex-shrink:0; }
-        .vi-mic { width:44px; height:44px; border-radius:999px; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition: background 0.15s, box-shadow 0.15s; }
-        .vi-mic.idle { background: var(--surf); color: var(--ink); }
-        .vi-mic.listening { background: var(--bad); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 30%, transparent); animation: mic-pulse 1s ease-in-out infinite; }
-        .vi-mic.disabled { background: var(--surf); color: var(--mute); cursor: not-allowed; opacity: 0.5; }
-        @keyframes mic-pulse { 0%,100%{ box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 30%, transparent); } 50%{ box-shadow: 0 0 0 8px color-mix(in srgb, var(--bad) 15%, transparent); } }
-        .vi-status { flex:1; font-family: var(--font-mono); font-size: 11.5px; color: var(--mute); }
-        .vi-speaking-dot { width:8px; height:8px; border-radius:999px; background: var(--accent); animation: speak-pulse 0.8s ease-in-out infinite; flex-shrink:0; }
-        @keyframes speak-pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
-        .vi-hint-btn { font-family: var(--font-mono); font-size: 10.5px; padding: 4px 10px; border:1px solid var(--line); border-radius: var(--r-1); cursor: pointer; background: transparent; color: var(--mute); transition: background 0.12s, color 0.12s; }
-        .vi-hint-btn:hover { background: var(--surf); color: var(--ink); }
-        .vi-hint-btn.active { border-color: var(--accent); color: var(--accent); }
-        .vi-err { font-family: var(--font-mono); font-size: 11px; color: var(--bad); padding: 4px 16px 8px; flex-shrink:0; }
-        .vi-tx-empty { flex:1; display:flex; align-items:center; justify-content:center; font-family: var(--font-read); font-style:italic; font-size:14px; color:var(--mute-2); }
-      ` }} />
-
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
       {/* Top bar */}
-      <div className="vi-bar">
-        <span className="vi-logo">CareerLab</span>
-        <span className="vi-qtitle">{questionTitle}</span>
+      <header className="shrink-0 border-b px-4 py-2 flex items-center gap-3 bg-background">
+        <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+          CareerLab
+        </span>
+        <span className="text-sm font-semibold flex-1 truncate">{questionTitle}</span>
         <button
+          type="button"
           onClick={() => setHintLevel((h) => ((h + 1) % 4) as HintLevel)}
-          className={`vi-hint-btn${hintLevel > 0 ? " active" : ""}`}
+          className={`inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded border transition-colors ${
+            hintLevel > 0
+              ? "border-primary text-primary"
+              : "border-input text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
           title="Cycle hint level"
         >
-          <Lightbulb style={{ width: 11, height: 11, display: "inline", marginRight: 4 }} />
+          <Lightbulb className="h-3 w-3" />
           {hintLevel === 0 ? "Hint" : `Hint L${hintLevel}`}
         </button>
         <button
+          type="button"
           onClick={endSession}
-          className="btn"
-          style={{ fontSize: 12, padding: "5px 14px" }}
+          className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded border border-input hover:bg-accent"
         >
-          <X style={{ width: 12, height: 12, display: "inline", marginRight: 4 }} />
+          <X className="h-3 w-3" />
           End
         </button>
-      </div>
+      </header>
 
       {/* Main area */}
-      <div className="vi-body">
+      <div className="flex flex-1 min-h-0">
         {/* Whiteboard */}
-        <div className="vi-wb">
+        <div className="flex-1 min-h-0" style={{ minHeight: 300 }}>
           <Whiteboard onChange={handleWhiteboardChange} />
         </div>
 
         {/* Transcript sidebar */}
-        <div className="vi-sidebar">
-          <div className="vi-tx">
+        <aside className="w-80 shrink-0 flex flex-col border-l bg-background">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2.5">
             {transcript.length === 0 ? (
-              <div className="vi-tx-empty">Conversation will appear here</div>
+              <div className="flex-1 flex items-center justify-center text-sm italic text-muted-foreground">
+                Conversation will appear here
+              </div>
             ) : (
               transcript.map((msg, i) => {
                 const isIv = msg.role === "interviewer";
                 return (
-                  <div key={i} className={`vi-tx-msg ${isIv ? "iv" : "cd"}`}>
-                    <span className="vi-tx-who">{isIv ? "Interviewer" : "You"}</span>
-                    <div className={`vi-tx-bubble ${isIv ? "iv" : "cd"}`}>{msg.content}</div>
+                  <div
+                    key={i}
+                    className={`flex flex-col gap-1 ${isIv ? "items-start" : "items-end"}`}
+                  >
+                    <span className="text-[9.5px] font-mono uppercase tracking-widest text-muted-foreground">
+                      {isIv ? "Interviewer" : "You"}
+                    </span>
+                    <div
+                      className={`max-w-[90%] rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap ${
+                        isIv
+                          ? "bg-muted text-foreground rounded-tl-sm"
+                          : "bg-primary text-primary-foreground rounded-tr-sm"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
                   </div>
                 );
               })
             )}
             {isListening && interimTranscript && (
-              <div className="vi-tx-interim">{interimTranscript}</div>
+              <div className="text-xs italic text-muted-foreground px-3 py-1">
+                {interimTranscript}
+              </div>
             )}
             {status === "thinking" && (
-              <div className="vi-tx-msg iv">
-                <span className="vi-tx-who">Interviewer</span>
-                <div className="vi-tx-bubble iv">
-                  <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} />
+              <div className="flex flex-col gap-1 items-start">
+                <span className="text-[9.5px] font-mono uppercase tracking-widest text-muted-foreground">
+                  Interviewer
+                </span>
+                <div className="max-w-[90%] rounded-lg rounded-tl-sm px-3 py-2 bg-muted">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 </div>
               </div>
             )}
@@ -343,30 +338,37 @@ export function VoiceInterviewSession({
           </div>
 
           {combinedError && (
-            <div className="vi-err">{combinedError}</div>
+            <div className="shrink-0 text-xs font-mono text-destructive px-4 py-1.5 border-t">
+              {combinedError}
+            </div>
           )}
 
-          {/* Bottom strip */}
-          <div className="vi-strip">
+          {/* Voice strip */}
+          <div className="shrink-0 border-t px-4 py-3 flex items-center gap-3 bg-background">
             <button
+              type="button"
               onClick={toggleMic}
-              className={`vi-mic${isListening ? " listening" : status === "thinking" || status === "speaking" ? " disabled" : " idle"}`}
               title={isListening ? "Stop recording" : "Start recording"}
-              disabled={status === "thinking" || status === "speaking"}
+              disabled={micDisabled}
+              className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                isListening
+                  ? "bg-destructive text-destructive-foreground animate-pulse"
+                  : micDisabled
+                    ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                    : "bg-muted text-foreground hover:bg-accent"
+              }`}
             >
-              {isListening ? (
-                <MicOff style={{ width: 20, height: 20 }} />
-              ) : (
-                <Mic style={{ width: 20, height: 20 }} />
-              )}
+              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
             </button>
-            <span className="vi-status">{statusText[status]}</span>
-            {isSpeaking && <div className="vi-speaking-dot" />}
+            <span className="flex-1 text-xs font-mono text-muted-foreground">
+              {statusText[status]}
+            </span>
+            {isSpeaking && (
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
+            )}
           </div>
-        </div>
+        </aside>
       </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `@keyframes spin { to { transform: rotate(360deg); } }` }} />
     </div>
   );
 }
