@@ -115,10 +115,11 @@ export function getCanvasJSON(elements: readonly WhiteboardElement[]): string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const COLORS = ["#1e1e1e", "#e03131", "#2f9e44", "#1971c2", "#f08c00", "#9c36b5"];
+const CANVAS_BG = "#111111";
+const COLORS = ["#f0f0f0", "#ff6b6b", "#69db7c", "#74c0fc", "#ffd43b", "#da77f2"];
 const STROKE_THIN = 2;
 const STROKE_THICK = 5;
-const DEFAULT_COLOR = "#1e1e1e";
+const DEFAULT_COLOR = "#f0f0f0";
 const DEFAULT_FONT_SIZE = 16;
 const ERASER_RADIUS = 10;
 const ARROWHEAD_LEN = 10;
@@ -435,7 +436,7 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 
@@ -557,11 +558,12 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
       // Commit any pending text edit on click outside.
       if (textEdit) return;
 
-      const canvas = canvasRef.current;
-      if (canvas) canvas.setPointerCapture(e.pointerId);
-
       const world = screenToWorld(e.clientX, e.clientY);
       const t = toolRef.current;
+
+      // Don't capture pointer for text tool — the input needs focus on mount.
+      const canvas = canvasRef.current;
+      if (canvas && t !== "text") canvas.setPointerCapture(e.pointerId);
       const c = colorRef.current;
       const sw = strokeWidthRef.current;
 
@@ -878,8 +880,8 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
         top: textEdit.worldY + panRef.current.y,
         font: `${DEFAULT_FONT_SIZE}px ui-sans-serif, system-ui, -apple-system, sans-serif`,
         color: colorRef.current,
-        background: "transparent",
-        border: "1px dashed #1971c2",
+        background: "rgba(0,0,0,0.5)",
+        border: "1px dashed #74c0fc",
         outline: "none",
         padding: "0 2px",
         minWidth: 40,
@@ -897,9 +899,9 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white">
+    <div className="flex flex-col h-full w-full" style={{ background: CANVAS_BG }}>
       {/* Toolbar */}
-      <div className="shrink-0 h-10 border-b border-input flex items-center gap-1 px-2 bg-white">
+      <div className="shrink-0 h-10 flex items-center gap-1 px-2" style={{ background: "#1c1c1c", borderBottom: "1px solid #333" }}>
         {toolButtons.map(({ tool: t, label, key, Icon }) => {
           const active = tool === t;
           return (
@@ -911,8 +913,8 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
               disabled={readOnly}
               className={`inline-flex items-center justify-center w-8 h-8 rounded border text-sm transition-colors ${
                 active
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-transparent text-foreground hover:bg-accent"
+                  ? "border-blue-400 bg-blue-400/20 text-blue-400"
+                  : "border-transparent text-zinc-300 hover:bg-zinc-700"
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -920,7 +922,7 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           );
         })}
 
-        <div className="mx-1 h-5 w-px bg-input" />
+        <div className="mx-1 h-5 w-px bg-zinc-600" />
 
         {/* Color swatches */}
         {COLORS.map((c) => (
@@ -937,7 +939,7 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           />
         ))}
 
-        <div className="mx-1 h-5 w-px bg-input" />
+        <div className="mx-1 h-5 w-px bg-zinc-600" />
 
         {/* Stroke width */}
         <button
@@ -947,8 +949,8 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           disabled={readOnly}
           className={`inline-flex items-center justify-center w-8 h-8 rounded border ${
             strokeWidth === STROKE_THIN
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-transparent hover:bg-accent"
+              ? "border-blue-400 bg-blue-400/20 text-blue-400"
+              : "border-transparent text-zinc-300 hover:bg-zinc-700"
           }`}
         >
           <span className="block w-4 h-[2px] bg-current" />
@@ -960,21 +962,21 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           disabled={readOnly}
           className={`inline-flex items-center justify-center w-8 h-8 rounded border ${
             strokeWidth === STROKE_THICK
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-transparent hover:bg-accent"
+              ? "border-blue-400 bg-blue-400/20 text-blue-400"
+              : "border-transparent text-zinc-300 hover:bg-zinc-700"
           }`}
         >
           <span className="block w-4 h-[5px] bg-current rounded-sm" />
         </button>
 
-        <div className="mx-1 h-5 w-px bg-input" />
+        <div className="mx-1 h-5 w-px bg-zinc-600" />
 
         <button
           type="button"
           onClick={undo}
           disabled={readOnly}
           title="Undo (Ctrl+Z)"
-          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent hover:bg-accent"
+          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent text-zinc-300 hover:bg-zinc-700"
         >
           <Undo2 className="h-4 w-4" />
         </button>
@@ -983,7 +985,7 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           onClick={redo}
           disabled={readOnly}
           title="Redo (Ctrl+Shift+Z)"
-          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent hover:bg-accent"
+          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent text-zinc-300 hover:bg-zinc-700"
         >
           <Redo2 className="h-4 w-4" />
         </button>
@@ -992,7 +994,7 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           onClick={clearAll}
           disabled={readOnly}
           title="Clear canvas"
-          className="ml-auto inline-flex items-center gap-1 px-2 h-8 rounded border border-input text-xs hover:bg-accent"
+          className="ml-auto inline-flex items-center gap-1 px-2 h-8 rounded text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200" style={{ border: "1px solid #444" }}
         >
           <Trash2 className="h-3.5 w-3.5" />
           Clear
