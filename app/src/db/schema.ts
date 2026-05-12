@@ -129,12 +129,13 @@ export const interviewSessions = sqliteTable("interview_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: text("user_id").notNull(),
   questionId: integer("question_id").notNull().references(() => questions.id),
-  mode: text("mode", { enum: ["self", "ai_vs_ai"] }).notNull().default("self"),
+  mode: text("mode", { enum: ["self", "ai_vs_ai", "voice"] }).notNull().default("self"),
   startedAt: ts("started_at").notNull().default(sql`(unixepoch('now') * 1000)`),
   endedAt: ts("ended_at"),
   transcript: text("transcript").notNull().default("[]"),
   rubric: text("rubric"),
   score: integer("score"),
+  whiteboardSnapshot: text("whiteboard_snapshot"),
 }, (t) => ({
   userIdx: index("interview_sessions_user_idx").on(t.userId),
 }));

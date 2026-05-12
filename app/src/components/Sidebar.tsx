@@ -11,14 +11,16 @@ import {
   Network,
   Notebook,
   Search,
+  Mic,
 } from "lucide-react";
 import { TRACKS, TRACK_LABELS, type Track } from "@/lib/tracks";
 
 const NAV_TOP = [
-  { id: "topics",      label: "Topics",      icon: Layers,     slug: "topics" },
-  { id: "questions",   label: "Questions",   icon: HelpCircle, slug: "questions" },
-  { id: "review",      label: "Review",      icon: Repeat,     slug: "review" },
-  { id: "cheatsheets", label: "Cheatsheets", icon: ScrollText, slug: "cheatsheets" },
+  { id: "topics",           label: "Topics",           icon: Layers,     slug: "topics" },
+  { id: "questions",        label: "Questions",        icon: HelpCircle, slug: "questions" },
+  { id: "review",           label: "Review",           icon: Repeat,     slug: "review" },
+  { id: "cheatsheets",      label: "Cheatsheets",      icon: ScrollText, slug: "cheatsheets" },
+  { id: "voice-interviews", label: "Voice Interviews", icon: Mic,        slug: "voice-interviews" },
 ] as const;
 
 const NAV_FOOT = [

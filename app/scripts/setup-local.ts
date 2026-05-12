@@ -58,34 +58,14 @@ if (!fs.existsSync(envPath)) {
 }
 
 // ── 2. DB schema push ────────────────────────────────────────────────────────
-// Check if the topics table exists as a proxy for whether schema was pushed
+// Always push — drizzle-kit push is idempotent and adds missing columns/tables.
 const dbPath = path.join(ROOT, "local.db");
-let needsPush = !fs.existsSync(dbPath);
-
-if (!needsPush) {
-  try {
-    const Database = require("better-sqlite3");
-    const db = new Database(dbPath);
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='topics'")
-      .all();
-    needsPush = tables.length === 0;
-    db.close();
-  } catch {
-    needsPush = true;
-  }
-}
-
-if (needsPush) {
-  log("Pushing DB schema via drizzle-kit...");
-  execSync("npx drizzle-kit push", {
-    cwd: ROOT,
-    stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: "sqlite:./local.db" },
-  });
-} else {
-  log("DB schema already up-to-date — skipping push");
-}
+log("Pushing DB schema via drizzle-kit...");
+execSync("npx drizzle-kit push", {
+  cwd: ROOT,
+  stdio: "inherit",
+  env: { ...process.env, DATABASE_URL: "sqlite:./local.db" },
+});
 
 // ── 3. Seed ──────────────────────────────────────────────────────────────────
 const MIN_TOPICS = 90; // must be <= total seeded topics (currently 93)

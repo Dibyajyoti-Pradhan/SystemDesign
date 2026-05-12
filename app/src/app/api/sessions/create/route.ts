@@ -21,12 +21,15 @@ export async function POST(req: NextRequest) {
   const [q] = await db.select().from(questions).where(eq(questions.slug, slug)).limit(1);
   if (!q) return NextResponse.json({ error: "Question not found" }, { status: 404 });
 
+  const resolvedMode =
+    mode === "ai_vs_ai" ? "ai_vs_ai" : mode === "voice" ? "voice" : "self";
+
   const [created] = await db
     .insert(interviewSessions)
     .values({
       userId,
       questionId: q.id,
-      mode: mode === "ai_vs_ai" ? "ai_vs_ai" : "self",
+      mode: resolvedMode,
       transcript: "[]",
     })
     .returning({ id: interviewSessions.id });

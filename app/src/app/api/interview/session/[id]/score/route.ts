@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiAuthGuard } from "@/lib/auth-guards";
 import { claudeRun } from "@/lib/anthropic";
 import { track } from "@/lib/analytics";
+import { db } from "@/db/client";
+import { interviewSessions } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface ScoreBody {
   transcriptHistory: { role: "interviewer" | "candidate"; content: string }[];
+  whiteboardSnapshot?: string;
 }
 
 export interface ScoreObject {
@@ -60,7 +64,7 @@ export async function POST(
   const guard = await apiAuthGuard();
   if (guard instanceof NextResponse) return guard;
 
-  await ctx.params; // consume params (id not needed for scoring standalone)
+  const { id } = await ctx.params;
 
   let body: ScoreBody;
   try {
@@ -69,7 +73,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { transcriptHistory = [] } = body;
+  const { transcriptHistory = [], whiteboardSnapshot } = body;
 
   if (transcriptHistory.length < 2) {
     return NextResponse.json(
@@ -127,6 +131,16 @@ export async function POST(
   };
 
   track('interview_complete', { communication: score.communication, correctness: score.correctness, efficiency: score.efficiency })
+
+  const sessionId = Number.parseInt(id, 10);
+  if (Number.isFinite(sessionId)) {
+    const updateValues: Record<string, unknown> = { endedAt: new Date() };
+    if (whiteboardSnapshot) updateValues.whiteboardSnapshot = whiteboardSnapshot;
+    await db
+      .update(interviewSessions)
+      .set(updateValues)
+      .where(eq(interviewSessions.id, sessionId));
+  }
 
   return NextResponse.json(score);
 }
