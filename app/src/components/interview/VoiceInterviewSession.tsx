@@ -200,9 +200,11 @@ export function VoiceInterviewSession({
   }, [firstInterviewerMessage]);
 
   // Called from the start overlay — this IS a user gesture so speech is allowed.
+  // Use speak() (immediate) not speakWhenReady() — the deferred voiceschanged path
+  // fires outside the gesture handler and Chrome silently blocks it.
   function startSession() {
     setStarted(true);
-    if (firstInterviewerMessage) speakWhenReady(firstInterviewerMessage);
+    if (firstInterviewerMessage) speak(firstInterviewerMessage);
   }
 
   async function endSession() {

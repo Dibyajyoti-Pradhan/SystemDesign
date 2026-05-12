@@ -4,6 +4,7 @@ import { questions, interviewSessions, type Question } from "@/db/schema";
 import { asc, eq, inArray, and } from "drizzle-orm";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 import { StartVoiceInterviewButton } from "@/components/interview/StartVoiceInterviewButton";
+import { StartAiVsAiVoiceButton } from "@/components/interview/StartAiVsAiVoiceButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
   const { track } = await params;
@@ -60,16 +61,12 @@ export default async function VoiceInterviewsPage({
         .vl__counts { display:flex; gap:18px; padding: 14px 0 4px; }
         .vl__counts span { font-family: var(--font-mono); font-size:11px; color:var(--mute); text-transform:uppercase; letter-spacing:.1em; }
         .vl__counts b { color: var(--ink); font-weight:500; }
-        .vr { display:grid; grid-template-columns: 32px 1fr 80px 80px 140px; gap:18px; padding: 16px 6px; border-bottom: 1px solid var(--line); align-items:center; }
+        .vr { display:grid; grid-template-columns: 32px 1fr 80px 80px auto; gap:18px; padding: 16px 6px; border-bottom: 1px solid var(--line); align-items:center; }
         .vr__n { font-family: var(--font-mono); font-size: 11px; color: var(--mute-2); padding-left: 6px; }
         .vr__t { font-size: 14.5px; color: var(--ink); letter-spacing: -0.005em; font-weight: 500; }
         .vr__d { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .12em; }
         .vr__min { font-family: var(--font-mono); font-size: 11px; color: var(--mute); text-align: right; }
-        .vr__btn { text-align: right; }
-        .vr__btn a { font-family: var(--font-mono); font-size: 11px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: var(--r-1); border: 1px solid var(--accent); color: var(--accent); text-decoration: none; transition: background 0.12s; }
-        .vr__btn a:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-        .vr__btn a.done { border-color: var(--line); color: var(--mute); }
-        .vr__btn a.done:hover { background: var(--surf); }
+        .vr__btn { display:flex; gap: 8px; align-items: center; justify-content: flex-end; }
       ` }} />
       <div className="vl">
         <div className="vl__inner">
@@ -117,6 +114,7 @@ export default async function VoiceInterviewsPage({
                     <span className="vr__d" style={{ color: diffColor }}>{q.difficulty}</span>
                     <span className="vr__min">~{q.estMinutes}m</span>
                     <div className="vr__btn">
+                      <StartAiVsAiVoiceButton slug={q.slug} />
                       <StartVoiceInterviewButton slug={q.slug} past={past} />
                     </div>
                   </div>
