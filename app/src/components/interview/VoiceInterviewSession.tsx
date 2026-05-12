@@ -48,6 +48,7 @@ export function VoiceInterviewSession({
   const whiteboardStateRef = useRef<WhiteboardAppState>(null);
   const isStreamingRef = useRef(false);
   const hasMountedRef = useRef(false);
+  const openingSpokenRef = useRef(false);
 
   // Refs that mirror state so async callbacks see fresh values without
   // having to re-create the callback for every change (avoids stale-closure
@@ -186,6 +187,8 @@ export function VoiceInterviewSession({
     }
   }, [isListening]);
 
+  // Set transcript on mount but do NOT speak yet — browsers block
+  // speechSynthesis without a user gesture. Speaking happens on first mic click.
   useEffect(() => {
     if (hasMountedRef.current) return;
     hasMountedRef.current = true;
@@ -193,9 +196,8 @@ export function VoiceInterviewSession({
       setTranscript([
         { role: "interviewer", content: firstInterviewerMessage, timestamp: new Date() },
       ]);
-      speak(firstInterviewerMessage);
     }
-  }, [firstInterviewerMessage, speak]);
+  }, [firstInterviewerMessage]);
 
   async function endSession() {
     if (!confirm("End this voice interview and get a score?")) return;
@@ -235,13 +237,20 @@ export function VoiceInterviewSession({
     if (isListening) {
       stopListening();
     } else {
+      // First mic click: speak the opening question (user gesture required by browser).
+      if (!openingSpokenRef.current && firstInterviewerMessage) {
+        openingSpokenRef.current = true;
+        speak(firstInterviewerMessage);
+        return;
+      }
       stopSpeaking();
       startListening();
     }
   }
 
+  const openingHeard = openingSpokenRef.current;
   const statusText: Record<Status, string> = {
-    idle: "Press mic to speak",
+    idle: openingHeard ? "Press mic to speak" : "Press mic to hear the question",
     listening: "Listening…",
     thinking: "Interviewer thinking…",
     speaking: "Interviewer speaking…",
