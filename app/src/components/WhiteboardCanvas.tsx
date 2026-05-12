@@ -237,8 +237,9 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   const undoStackRef = useRef<WhiteboardElement[][]>([]);
   const redoStackRef = useRef<WhiteboardElement[][]>([]);
 
-  // Pan offset (in screen pixels).
+  // Pan offset (in screen pixels) and zoom scale.
   const panRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1);
 
   // Pointer / drag state.
   const draftRef = useRef<WhiteboardElement | null>(null);
@@ -452,7 +453,8 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
 
     ctx.save();
     // DPR scaling + pan translation.
-    ctx.setTransform(dpr, 0, 0, dpr, panRef.current.x * dpr, panRef.current.y * dpr);
+    const z = zoomRef.current;
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, panRef.current.x * dpr, panRef.current.y * dpr);
 
     void width;
     void height;
@@ -508,7 +510,8 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
     const rect = canvas.getBoundingClientRect();
     const sx = clientX - rect.left;
     const sy = clientY - rect.top;
-    return { x: sx - panRef.current.x, y: sy - panRef.current.y };
+    const z = zoomRef.current;
+    return { x: (sx - panRef.current.x) / z, y: (sy - panRef.current.y) / z };
   }, []);
 
   // ---------------------------------------------------------------------
@@ -886,9 +889,9 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   const textInputStyle: CSSProperties | undefined = textEdit
     ? {
         position: "absolute",
-        left: textEdit.worldX + panRef.current.x,
-        top: textEdit.worldY + panRef.current.y,
-        font: `${DEFAULT_FONT_SIZE}px ui-sans-serif, system-ui, -apple-system, sans-serif`,
+        left: textEdit.worldX * zoomRef.current + panRef.current.x,
+        top: textEdit.worldY * zoomRef.current + panRef.current.y,
+        font: `${DEFAULT_FONT_SIZE * zoomRef.current}px ui-sans-serif, system-ui, -apple-system, sans-serif`,
         color: colorRef.current,
         background: "rgba(0,0,0,0.5)",
         border: "1px dashed #74c0fc",
@@ -1020,6 +1023,22 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onWheel={(e) => {
+            e.preventDefault();
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            const oldZoom = zoomRef.current;
+            const factor = e.deltaY < 0 ? 1.1 : 0.9;
+            const newZoom = Math.min(10, Math.max(0.1, oldZoom * factor));
+            // Zoom toward cursor: world point under cursor must stay fixed.
+            panRef.current.x = cursorX - (cursorX - panRef.current.x) * (newZoom / oldZoom);
+            panRef.current.y = cursorY - (cursorY - panRef.current.y) * (newZoom / oldZoom);
+            zoomRef.current = newZoom;
+            requestRedraw();
+          }}
         />
         {textEdit && (
           <input
