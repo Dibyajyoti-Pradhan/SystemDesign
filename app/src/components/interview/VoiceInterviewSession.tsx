@@ -258,26 +258,6 @@ export function VoiceInterviewSession({
   const combinedError = error ?? sttError;
   const micDisabled = status === "thinking" || status === "speaking";
 
-  if (!started) {
-    return (
-      <div
-        onClick={startSession}
-        style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg)", cursor: "pointer", gap: 20, userSelect: "none" }}
-      >
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>CareerLab · Voice Interview</div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 420, textAlign: "center" }}>{questionTitle}</div>
-        <button
-          type="button"
-          style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 28px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
-        >
-          <Mic style={{ width: 16, height: 16 }} />
-          Begin Interview
-        </button>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)", marginTop: 4 }}>Interviewer will speak when you click</div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-ui)" }}>
       {/* Top bar — matches .topbar pattern */}
@@ -307,8 +287,29 @@ export function VoiceInterviewSession({
       {/* Main area */}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {/* Whiteboard */}
-        <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: "relative" }}>
           <Whiteboard onChange={handleWhiteboardChange} />
+          {!started && (
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "color-mix(in srgb, var(--bg) 82%, transparent)",
+              backdropFilter: "blur(2px)",
+              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: 18, zIndex: 10,
+            }}>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Voice Interview · Beta</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 400, textAlign: "center", lineHeight: 1.25 }}>{questionTitle}</div>
+              <button
+                type="button"
+                onClick={startSession}
+                style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 10, padding: "11px 26px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
+              >
+                <Mic style={{ width: 16, height: 16 }} />
+                Begin Interview
+              </button>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)" }}>Interviewer will speak when you click</div>
+            </div>
+          )}
         </div>
 
         {/* Transcript sidebar */}

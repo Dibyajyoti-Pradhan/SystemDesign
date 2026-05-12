@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { db } from "@/db/client";
 import { questions, interviewSessions, type Question } from "@/db/schema";
 import { asc, eq, inArray, and } from "drizzle-orm";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
+import { StartVoiceInterviewButton } from "@/components/interview/StartVoiceInterviewButton";
 
 export async function generateMetadata({ params }: { params: Promise<{ track: string }> }) {
   const { track } = await params;
@@ -117,12 +117,7 @@ export default async function VoiceInterviewsPage({
                     <span className="vr__d" style={{ color: diffColor }}>{q.difficulty}</span>
                     <span className="vr__min">~{q.estMinutes}m</span>
                     <div className="vr__btn">
-                      <Link
-                        href={`/interview/voice/start/${q.slug}`}
-                        className={past > 0 ? "done" : ""}
-                      >
-                        🎙 {past > 0 ? `Again (${past})` : "Start"}
-                      </Link>
+                      <StartVoiceInterviewButton slug={q.slug} past={past} />
                     </div>
                   </div>
                 );

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mic } from "lucide-react";
 
-export function StartVoiceInterviewButton({ slug }: { slug: string }) {
+export function StartVoiceInterviewButton({ slug, past = 0 }: { slug: string; past?: number }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,20 +35,27 @@ export function StartVoiceInterviewButton({ slug }: { slug: string }) {
       <button
         onClick={start}
         disabled={loading}
-        className="btn btn--primary"
-        style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+        style={{
+          fontFamily: "var(--font-mono)", fontSize: 11,
+          display: "inline-flex", alignItems: "center", gap: 5,
+          padding: "5px 12px", borderRadius: "var(--r-1)",
+          border: past > 0 ? "1px solid var(--line)" : "1px solid var(--accent)",
+          color: past > 0 ? "var(--mute)" : "var(--accent)",
+          background: "transparent", cursor: loading ? "not-allowed" : "pointer",
+          opacity: loading ? 0.7 : 1, transition: "background 0.12s",
+        }}
       >
         {loading ? (
           <>
-            <svg style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <svg style={{ width: 11, height: 11, animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
             Starting…
           </>
         ) : (
           <>
-            <Mic style={{ width: 14, height: 14 }} />
-            Start Voice Interview
+            <Mic style={{ width: 11, height: 11 }} />
+            {past > 0 ? `Again (${past})` : "Start"}
           </>
         )}
       </button>
