@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type CSSProperties,
@@ -217,6 +219,10 @@ function translateElement(
 // Component
 // ---------------------------------------------------------------------------
 
+export interface WhiteboardHandle {
+  addElements: (elements: WhiteboardElement[]) => void;
+}
+
 export interface WhiteboardCanvasProps {
   onChange?: (elements: WhiteboardElement[]) => void;
   readOnly?: boolean;
@@ -228,7 +234,8 @@ interface TextEditState {
   value: string;
 }
 
-export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps) {
+export const WhiteboardCanvas = forwardRef<WhiteboardHandle, WhiteboardCanvasProps>(
+function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -356,6 +363,16 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
     requestRedraw();
     notifyChange();
   }, [notifyChange, pushUndo, requestRedraw]);
+
+  // Imperative API — lets parent inject AI-drawn elements programmatically.
+  useImperativeHandle(ref, () => ({
+    addElements(newEls: WhiteboardElement[]) {
+      pushUndo();
+      elementsRef.current = [...elementsRef.current, ...newEls];
+      requestRedraw();
+      notifyChange();
+    },
+  }), [pushUndo, requestRedraw, notifyChange]);
 
   // ---------------------------------------------------------------------
   // Drawing
@@ -1027,4 +1044,5 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
       </div>
     </div>
   );
-}
+});
+WhiteboardCanvas.displayName = "WhiteboardCanvas";
