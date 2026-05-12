@@ -11,12 +11,20 @@ interface UseVoicePlaybackReturn {
 export function useVoicePlayback(): UseVoicePlaybackReturn {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
+  // Voices in many browsers (notably Chrome) load asynchronously — listening
+  // to voiceschanged ensures we have them by the time we speak().
   useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const refresh = () => {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    };
+    refresh();
+    window.speechSynthesis.addEventListener("voiceschanged", refresh);
     return () => {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
+      window.speechSynthesis.removeEventListener("voiceschanged", refresh);
+      window.speechSynthesis.cancel();
     };
   }, []);
 
@@ -37,7 +45,10 @@ export function useVoicePlayback(): UseVoicePlaybackReturn {
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
 
-      const voices = window.speechSynthesis.getVoices();
+      const voices =
+        voicesRef.current.length > 0
+          ? voicesRef.current
+          : window.speechSynthesis.getVoices();
       const preferred =
         voices.find((v) => v.lang === "en-GB" && v.name.includes("Neural")) ??
         voices.find((v) => v.lang === "en-GB") ??

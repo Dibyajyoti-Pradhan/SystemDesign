@@ -134,7 +134,12 @@ export async function POST(
 
   const sessionId = Number.parseInt(id, 10);
   if (Number.isFinite(sessionId)) {
-    const updateValues: Record<string, unknown> = { endedAt: new Date() };
+    const updateValues: Record<string, unknown> = {
+      endedAt: new Date(),
+      transcript: JSON.stringify(transcriptHistory),
+      rubric: JSON.stringify(score),
+      score: score.communication + score.correctness + score.efficiency,
+    };
     if (whiteboardSnapshot) updateValues.whiteboardSnapshot = whiteboardSnapshot;
     await db
       .update(interviewSessions)

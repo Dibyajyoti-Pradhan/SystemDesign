@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/db/client";
-import { questions, interviewSessions } from "@/db/schema";
+import { questions, interviewSessions, type Question } from "@/db/schema";
 import { asc, eq, inArray, and } from "drizzle-orm";
 import { parseTrack, TRACK_LABELS } from "@/lib/paths";
 
@@ -20,13 +20,13 @@ export default async function VoiceInterviewsPage({
   const track = parseTrack(trackParam);
   if (!track) notFound();
 
-  const all = await db
+  const all: Question[] = await db
     .select()
     .from(questions)
     .where(eq(questions.track, track))
     .orderBy(asc(questions.number));
 
-  const questionIds = all.map((q) => q.id);
+  const questionIds = all.map((q: Question) => q.id);
   const sessions = questionIds.length
     ? await db
         .select({ questionId: interviewSessions.questionId })
@@ -102,7 +102,7 @@ export default async function VoiceInterviewsPage({
             </div>
           ) : (
             <div>
-              {all.map((q, idx) => {
+              {all.map((q: Question, idx: number) => {
                 const past = sessionsByQuestion.get(q.id) ?? 0;
                 const diffColor =
                   q.difficulty === "easy"

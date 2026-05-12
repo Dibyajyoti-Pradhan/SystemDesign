@@ -6,12 +6,18 @@ import { useRouter } from "next/navigation";
 import { Mic, MicOff, Loader2, Lightbulb, X } from "lucide-react";
 import { useVoiceCapture } from "@/hooks/useVoiceCapture";
 import { useVoicePlayback } from "@/hooks/useVoicePlayback";
-import { getWhiteboardJSON } from "@/components/Whiteboard";
+import {
+  getWhiteboardJSON,
+  type WhiteboardElements,
+  type WhiteboardAppState,
+} from "@/components/Whiteboard";
 
 const Whiteboard = dynamic(
   () => import("@/components/Whiteboard").then((m) => ({ default: m.Whiteboard })),
   { ssr: false },
 );
+
+type HintLevel = 0 | 1 | 2 | 3;
 
 interface Message {
   role: "interviewer" | "candidate";
@@ -36,115 +42,149 @@ export function VoiceInterviewSession({
   const [transcript, setTranscript] = useState<Message[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3>(0);
+  const [hintLevel, setHintLevel] = useState<HintLevel>(0);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
-  const whiteboardElementsRef = useRef<readonly unknown[]>([]);
-  const whiteboardStateRef = useRef<unknown>(null);
+  const whiteboardElementsRef = useRef<WhiteboardElements>([]);
+  const whiteboardStateRef = useRef<WhiteboardAppState>(null);
   const isStreamingRef = useRef(false);
   const hasMountedRef = useRef(false);
 
-  const { speak, stop: stopSpeaking, isSpeaking } = useVoicePlayback();
-
+  // Refs that mirror state so async callbacks see fresh values without
+  // having to re-create the callback for every change (avoids stale-closure
+  // bugs when handleTranscript is fired from the speech-recognition event).
+  const transcriptRef = useRef<Message[]>([]);
+  const hintLevelRef = useRef<HintLevel>(0);
   useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+  useEffect(() => {
+    hintLevelRef.current = hintLevel;
+  }, [hintLevel]);
+
+  const { speak, stop: stopSpeaking, isSpeaking } = useVoicePlayback();
+  const isSpeakingRef = useRef(false);
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
     if (isSpeaking) {
       setStatus("speaking");
-    } else if (status === "speaking") {
-      setStatus("idle");
+    } else {
+      // Only drop back to idle from the speaking state — don't stomp on
+      // listening/thinking transitions that may have happened concurrently.
+      setStatus((cur) => (cur === "speaking" ? "idle" : cur));
     }
-  }, [isSpeaking, status]);
+  }, [isSpeaking]);
 
-  const handleWhiteboardChange = useCallback((elements: readonly unknown[], state: unknown) => {
-    whiteboardElementsRef.current = elements;
-    whiteboardStateRef.current = state;
-  }, []);
+  const handleWhiteboardChange = useCallback(
+    (elements: WhiteboardElements, state: WhiteboardAppState) => {
+      whiteboardElementsRef.current = elements;
+      whiteboardStateRef.current = state;
+    },
+    [],
+  );
 
   useEffect(() => {
     const el = transcriptEndRef.current;
     if (el) el.scrollIntoView({ behavior: "smooth" });
   }, [transcript.length]);
 
-  async function sendMessage(messageText: string, useHint = false) {
-    if (isStreamingRef.current) return;
-    isStreamingRef.current = true;
-    setStatus("thinking");
-    setError(null);
+  const sendMessage = useCallback(
+    async (messageText: string, useHint = false) => {
+      if (isStreamingRef.current) return;
+      isStreamingRef.current = true;
+      setStatus("thinking");
+      setError(null);
 
-    const whiteboardState = getWhiteboardJSON(
-      whiteboardElementsRef.current as readonly Record<string, unknown>[],
-      whiteboardStateRef.current,
-    );
+      const whiteboardState = getWhiteboardJSON(
+        whiteboardElementsRef.current,
+        whiteboardStateRef.current,
+      );
 
-    setTranscript((prev) => [
-      ...prev,
-      { role: "candidate", content: messageText, timestamp: new Date() },
-    ]);
-
-    const transcriptForApi = transcript.map((m) => ({ role: m.role, content: m.content }));
-    transcriptForApi.push({ role: "candidate", content: messageText });
-
-    try {
-      const res = await fetch(`/api/interview/session/${sessionId}/message`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          message: messageText,
-          whiteboardState: whiteboardState !== "[]" ? whiteboardState : undefined,
-          transcriptHistory: transcriptForApi.slice(0, -1),
-          hintLevel: useHint ? hintLevel : 0,
-        }),
-      });
-
-      if (!res.ok || !res.body) throw new Error(`Server error: ${res.status}`);
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-      }
-
-      if (!accumulated) throw new Error("Empty response");
-      if (accumulated.includes("[error:")) {
-        const match = accumulated.match(/\[error: ([^\]]+)\]/);
-        throw new Error(match ? match[1] : "Stream error");
-      }
-
-      const cleaned = accumulated.replace(/<<INTERVIEW_END>>/g, "").trimEnd();
       setTranscript((prev) => [
         ...prev,
-        { role: "interviewer", content: cleaned, timestamp: new Date() },
+        { role: "candidate", content: messageText, timestamp: new Date() },
       ]);
 
-      if (useHint && hintLevel > 0) setHintLevel(0);
+      // Read live transcript from the ref so concurrent sends never see a stale snapshot.
+      const transcriptForApi = transcriptRef.current.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      transcriptForApi.push({ role: "candidate", content: messageText });
 
-      speak(cleaned);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to get response");
-      setStatus("idle");
-    } finally {
-      isStreamingRef.current = false;
-      if (!isSpeaking) setStatus("idle");
-    }
-  }
+      const currentHint = hintLevelRef.current;
+
+      try {
+        const res = await fetch(`/api/interview/session/${sessionId}/message`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            message: messageText,
+            whiteboardState: whiteboardState !== "[]" ? whiteboardState : undefined,
+            transcriptHistory: transcriptForApi.slice(0, -1),
+            hintLevel: useHint ? currentHint : 0,
+          }),
+        });
+
+        if (!res.ok || !res.body) throw new Error(`Server error: ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          accumulated += decoder.decode(value, { stream: true });
+        }
+
+        if (!accumulated) throw new Error("Empty response");
+        if (accumulated.includes("[error:")) {
+          const match = accumulated.match(/\[error: ([^\]]+)\]/);
+          throw new Error(match ? match[1] : "Stream error");
+        }
+
+        const cleaned = accumulated.replace(/<<INTERVIEW_END>>/g, "").trimEnd();
+        setTranscript((prev) => [
+          ...prev,
+          { role: "interviewer", content: cleaned, timestamp: new Date() },
+        ]);
+
+        if (useHint && currentHint > 0) setHintLevel(0);
+
+        speak(cleaned);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to get response");
+        // Make sure we don't get stuck in "thinking" if an error fires before
+        // the speech-synthesis effect has a chance to flip status back.
+        setStatus((cur) => (cur === "thinking" ? "idle" : cur));
+      } finally {
+        isStreamingRef.current = false;
+        // Read isSpeaking from the ref to avoid stale-closure misreads.
+        if (!isSpeakingRef.current) {
+          setStatus((cur) => (cur === "thinking" ? "idle" : cur));
+        }
+      }
+    },
+    [sessionId, speak],
+  );
 
   const handleTranscript = useCallback(
     (text: string) => {
       void sendMessage(text);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transcript, hintLevel, sessionId],
+    [sendMessage],
   );
 
   const { isListening, startListening, stopListening, interimTranscript, error: sttError } =
     useVoiceCapture({ onTranscript: handleTranscript });
 
   useEffect(() => {
-    if (isListening) setStatus("listening");
-    else if (status === "listening") setStatus("idle");
-  }, [isListening, status]);
+    if (isListening) {
+      setStatus("listening");
+    } else {
+      setStatus((cur) => (cur === "listening" ? "idle" : cur));
+    }
+  }, [isListening]);
 
   useEffect(() => {
     if (hasMountedRef.current) return;
@@ -163,9 +203,12 @@ export function VoiceInterviewSession({
     stopSpeaking();
     setStatus("thinking");
 
-    const transcriptForApi = transcript.map((m) => ({ role: m.role, content: m.content }));
+    const transcriptForApi = transcriptRef.current.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     const whiteboardState = getWhiteboardJSON(
-      whiteboardElementsRef.current as readonly Record<string, unknown>[],
+      whiteboardElementsRef.current,
       whiteboardStateRef.current,
     );
 
@@ -245,7 +288,7 @@ export function VoiceInterviewSession({
         <span className="vi-logo">CareerLab</span>
         <span className="vi-qtitle">{questionTitle}</span>
         <button
-          onClick={() => setHintLevel((h) => ((h + 1) % 4) as 0 | 1 | 2 | 3)}
+          onClick={() => setHintLevel((h) => ((h + 1) % 4) as HintLevel)}
           className={`vi-hint-btn${hintLevel > 0 ? " active" : ""}`}
           title="Cycle hint level"
         >

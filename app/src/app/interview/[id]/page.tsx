@@ -296,7 +296,7 @@ export default function InterviewSessionPage({ params }: PageProps) {
         {/* Whiteboard — full width on mobile, 60% on md+ */}
         <div className="w-full md:w-3/5 flex flex-col min-h-0 border-b md:border-b-0 md:border-r">
           <div className="flex-1 min-h-0" style={{ minHeight: '300px' }}>
-            <Whiteboard onChange={handleWhiteboardChange} />
+            <Whiteboard onChange={handleWhiteboardChange} theme="dark" />
           </div>
 
           {/* Input at bottom of whiteboard column */}

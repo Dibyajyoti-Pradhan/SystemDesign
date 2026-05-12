@@ -3,11 +3,14 @@ import { db } from "@/db/client";
 import { interviewSessions, questions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { VoiceInterviewSession } from "@/components/interview/VoiceInterviewSession";
-import { buildInterviewerSystemPrompt } from "@/lib/interviewer";
 
 const OPENING_PREFIX = `Let's get started. `;
 
-async function getFirstInterviewerMessage(questionTitle: string, questionDifficulty: string, estMinutes: number): Promise<string> {
+function getFirstInterviewerMessage(
+  questionTitle: string,
+  questionDifficulty: string,
+  estMinutes: number,
+): string {
   return `${OPENING_PREFIX}Today we'll be working through a ${questionDifficulty} system-design problem: "${questionTitle}". This is a ${estMinutes}-minute interview. Before we dive in, I'd like you to ask me your clarifying questions to nail down the scope. Go ahead whenever you're ready.`;
 }
 
@@ -35,7 +38,7 @@ export default async function VoiceInterviewPage({
     .limit(1);
   if (!question) notFound();
 
-  const openingMessage = await getFirstInterviewerMessage(
+  const openingMessage = getFirstInterviewerMessage(
     question.title,
     question.difficulty,
     question.estMinutes,
