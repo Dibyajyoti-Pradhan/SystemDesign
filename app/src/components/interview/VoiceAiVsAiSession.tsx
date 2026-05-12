@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Play, Pause, StepForward, X, Loader2, Bot } from "lucide-react";
-import { type WhiteboardHandle, type WhiteboardElements, type WhiteboardAppState } from "@/components/Whiteboard";
+import {
+  type WhiteboardHandle,
+  type WhiteboardElements,
+  type WhiteboardAppState,
+} from "@/components/Whiteboard";
 import { type WhiteboardElement } from "@/components/WhiteboardCanvas";
 
 const Whiteboard = dynamic(
@@ -39,8 +43,11 @@ interface Props {
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Speak text and fire onEnd — separate from useVoicePlayback so we can wire
-// the auto-advance callback without restructuring the shared hook.
+// Strip ```mermaid ... ``` blocks — diagrams go on the whiteboard, not transcript
+function stripMermaid(text: string): string {
+  return text.replace(/```mermaid[\s\S]*?```/gi, "").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function speakTurn(
   text: string,
   role: "interviewer" | "candidate",
@@ -49,8 +56,8 @@ function speakTurn(
   if (typeof window === "undefined" || !window.speechSynthesis) { onEnd(); return; }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.rate = role === "interviewer" ? 0.92 : 0.97;
-  u.pitch = role === "interviewer" ? 1.0 : 0.95;
+  u.rate = role === "interviewer" ? 0.93 : 0.97;
+  u.pitch = role === "interviewer" ? 1.0 : 0.93;
   const voices = window.speechSynthesis.getVoices();
   if (role === "interviewer") {
     const v =
@@ -70,86 +77,94 @@ function speakTurn(
   window.speechSynthesis.speak(u);
 }
 
-// Parse key architectural terms from an AI response and convert to whiteboard
-// text/rect elements. We place them in a loose grid to avoid overlap.
+// Arch terms we recognise and label on the whiteboard
+const ARCH_TERMS: [string, string][] = [
+  ["load balancer", "Load Balancer"], ["api gateway", "API Gateway"],
+  ["cdn", "CDN"], ["cache", "Cache"], ["redis", "Redis"],
+  ["database", "Database"], ["postgres", "Postgres"], ["mysql", "MySQL"],
+  ["cassandra", "Cassandra"], ["dynamodb", "DynamoDB"],
+  ["message queue", "Message Queue"], ["kafka", "Kafka"], ["sqs", "SQS"],
+  ["pubsub", "Pub/Sub"], ["worker", "Workers"], ["app tier", "App Tier"],
+  ["app server", "App Server"], ["service", "Service"],
+  ["storage", "Object Storage"], ["s3", "S3"], ["blob", "Blob Store"],
+  ["search", "Search"], ["elasticsearch", "Elasticsearch"],
+  ["rate limit", "Rate Limiter"], ["auth", "Auth Service"],
+  ["replica", "Replica"], ["shard", "Sharding"], ["index", "Index"],
+];
+
+// Layout: place boxes in a loose grid. Returns (x,y) for slot n.
+function slotPosition(n: number, cols = 4): { x: number; y: number } {
+  const col = n % cols;
+  const row = Math.floor(n / cols);
+  return { x: 60 + col * 210, y: 60 + row * 90 };
+}
+
 function extractDrawingElements(
   text: string,
   role: "interviewer" | "candidate",
-  existingCount: number,
-): WhiteboardElement[] {
-  const ARCH_TERMS = [
-    "load balancer", "database", "cache", "api gateway", "cdn", "queue",
-    "message queue", "service", "microservice", "storage", "proxy",
-    "server", "client", "auth", "authentication", "rate limiter",
-    "sharding", "replica", "kafka", "redis", "postgres", "mysql",
-    "s3", "blob storage", "indexing", "search", "pubsub",
-  ];
+  usedLabels: Set<string>,
+  nextSlot: number,
+): { elements: WhiteboardElement[]; newSlot: number; targetPos: { x: number; y: number } | null } {
   const lower = text.toLowerCase();
-  const found: string[] = [];
-  for (const term of ARCH_TERMS) {
-    if (lower.includes(term) && !found.includes(term)) found.push(term);
-    if (found.length >= 3) break;
+  const toAdd: string[] = [];
+  for (const [keyword, label] of ARCH_TERMS) {
+    if (lower.includes(keyword) && !usedLabels.has(label)) {
+      toAdd.push(label);
+      if (toAdd.length >= 3) break;
+    }
   }
-  if (found.length === 0) return [];
 
-  // Colors: interviewer draws in amber, candidate draws in blue
+  if (toAdd.length === 0) return { elements: [], newSlot: nextSlot, targetPos: null };
+
   const color = role === "interviewer" ? "#D4A574" : "#7DA7C9";
-  const cols = 4;
-  const cellW = 200;
-  const cellH = 80;
-  const startX = 60;
-  const startY = 60;
+  const elements: WhiteboardElement[] = [];
+  let firstPos: { x: number; y: number } | null = null;
 
-  return found.map((term, i) => {
-    const slot = existingCount + i;
-    const col = slot % cols;
-    const row = Math.floor(slot / cols);
-    const id = `ai-${Date.now()}-${i}`;
-    const x = startX + col * (cellW + 20);
-    const y = startY + row * (cellH + 20);
-    return {
-      id,
-      type: "rect" as const,
-      x,
-      y,
-      width: cellW - 20,
-      height: cellH - 20,
+  toAdd.forEach((label, i) => {
+    usedLabels.add(label);
+    const { x, y } = slotPosition(nextSlot + i);
+    if (i === 0) firstPos = { x, y };
+
+    elements.push({
+      id: `ai-r-${Date.now()}-${i}`,
+      type: "rect",
+      x, y,
+      width: 160, height: 52,
       color,
       fill: "transparent",
       strokeWidth: 1.5,
-      label: term,
-    } as WhiteboardElement & { label?: string };
-  }).flatMap((rect, i) => {
-    // Return the rect + a text label inside it
-    const term = found[i];
-    const textEl: WhiteboardElement = {
-      id: `${rect.id}-t`,
+    } as WhiteboardElement);
+
+    elements.push({
+      id: `ai-t-${Date.now()}-${i}`,
       type: "text",
-      x: rect.x + 10,
-      y: rect.y + 18,
-      color: (rect as { color: string }).color,
+      x: x + 12, y: y + 18,
+      color,
       strokeWidth: 1,
-      text: term.toUpperCase(),
-      fontSize: 12,
-    };
-    return [rect as WhiteboardElement, textEl];
+      text: label,
+      fontSize: 13,
+    } as WhiteboardElement);
   });
+
+  return { elements, newSlot: nextSlot + toAdd.length, targetPos: firstPos };
 }
 
 // ---------------------------------------------------------------------------
-// Cursor animation — smooth random walk within canvas bounds
+// Cursor animation — smooth random walk, optionally target a specific point
 // ---------------------------------------------------------------------------
 
 function animateCursor(
-  setPos: (pos: CursorPos) => void,
+  setPos: (p: CursorPos) => void,
   stopRef: { current: boolean },
   bounds: { w: number; h: number },
+  target?: { x: number; y: number },
 ) {
-  let cx = bounds.w * (0.3 + Math.random() * 0.4);
-  let cy = bounds.h * (0.2 + Math.random() * 0.4);
-  let tx = cx;
-  let ty = cy;
-  let lastTarget = 0;
+  let cx = bounds.w * (0.3 + Math.random() * 0.3);
+  let cy = bounds.h * (0.2 + Math.random() * 0.3);
+  let tx = target?.x ?? cx;
+  let ty = target?.y ?? cy;
+  let lastPick = 0;
+  let phase: "goto" | "wander" = target ? "goto" : "wander";
   let rafId = 0;
 
   function tick(now: number) {
@@ -157,15 +172,23 @@ function animateCursor(
       setPos({ x: cx, y: cy, visible: false });
       return;
     }
-    // Pick a new target every 900–1800ms
-    if (now - lastTarget > 900 + Math.random() * 900) {
-      tx = bounds.w * (0.1 + Math.random() * 0.75);
-      ty = bounds.h * (0.1 + Math.random() * 0.75);
-      lastTarget = now;
+
+    if (phase === "goto") {
+      // Ease toward the target element, then switch to wandering nearby
+      cx += (tx - cx) * 0.1;
+      cy += (ty - cy) * 0.1;
+      if (Math.hypot(tx - cx, ty - cy) < 5) phase = "wander";
+    } else {
+      // Pick new random target within canvas periodically
+      if (now - lastPick > 800 + Math.random() * 1000) {
+        tx = Math.max(40, Math.min(bounds.w - 40, tx + (Math.random() - 0.5) * 300));
+        ty = Math.max(40, Math.min(bounds.h - 40, ty + (Math.random() - 0.5) * 200));
+        lastPick = now;
+      }
+      cx += (tx - cx) * 0.07;
+      cy += (ty - cy) * 0.07;
     }
-    // Ease toward target
-    cx += (tx - cx) * 0.06;
-    cy += (ty - cy) * 0.06;
+
     setPos({ x: cx, y: cy, visible: true });
     rafId = requestAnimationFrame(tick);
   }
@@ -177,6 +200,10 @@ function animateCursor(
 // Component
 // ---------------------------------------------------------------------------
 
+const CURSOR_IV = "#D4A574";
+const CURSOR_CX = "#7DA7C9";
+const CURSOR_HU = "#7FB48A";
+
 export function VoiceAiVsAiSession({
   sessionId,
   questionTitle,
@@ -185,7 +212,6 @@ export function VoiceAiVsAiSession({
 }: Props) {
   const router = useRouter();
   const whiteboardRef = useRef<WhiteboardHandle>(null);
-  const whiteboardElsRef = useRef<WhiteboardElements>([]);
   const whiteboardContainerRef = useRef<HTMLDivElement>(null);
 
   const [transcript, setTranscript] = useState<Msg[]>(initialTranscript);
@@ -197,17 +223,18 @@ export function VoiceAiVsAiSession({
   const [error, setError] = useState<string | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
-  // Cursors
-  const [ivCursor, setIvCursor] = useState<CursorPos>({ x: 200, y: 150, visible: false });
-  const [cxCursor, setCxCursor] = useState<CursorPos>({ x: 500, y: 300, visible: false });
+  const [ivCursor, setIvCursor] = useState<CursorPos>({ x: 180, y: 130, visible: false });
+  const [cxCursor, setCxCursor] = useState<CursorPos>({ x: 460, y: 280, visible: false });
   const [humanCursor, setHumanCursor] = useState<{ x: number; y: number } | null>(null);
 
-  // Stable refs for async callbacks
+  // Stable refs
   const isPlayingRef = useRef(false);
   const endedRef = useRef(initialEnded);
   const isSteppingRef = useRef(false);
-  const aiElementCountRef = useRef(0);
-  const animStopRef = useRef({ current: false });
+  const usedLabelsRef = useRef<Set<string>>(new Set());
+  const nextSlotRef = useRef(0);
+  const animStopRef = useRef<{ current: boolean }>({ current: false });
+  const lastDrawTargetRef = useRef<{ x: number; y: number } | undefined>(undefined);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { endedRef.current = ended; }, [ended]);
@@ -216,7 +243,7 @@ export function VoiceAiVsAiSession({
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcript.length]);
 
-  // Animate the active speaker's cursor
+  // Animate the active speaker's cursor; aim toward recently drawn element
   useEffect(() => {
     if (!currentSpeaker) return;
     const container = whiteboardContainerRef.current;
@@ -225,9 +252,26 @@ export function VoiceAiVsAiSession({
     const stopRef = { current: false };
     animStopRef.current = stopRef;
     const setter = currentSpeaker === "interviewer" ? setIvCursor : setCxCursor;
-    const cancel = animateCursor(setter, stopRef, { w, h });
+    const cancel = animateCursor(setter, stopRef, { w, h }, lastDrawTargetRef.current);
     return () => { stopRef.current = true; cancel(); };
   }, [currentSpeaker]);
+
+  // Draw the question title on the whiteboard on first step
+  const drawnTitleRef = useRef(false);
+  function maybeDrawTitle() {
+    if (drawnTitleRef.current || !whiteboardRef.current) return;
+    drawnTitleRef.current = true;
+    const title: WhiteboardElement = {
+      id: "title-text",
+      type: "text",
+      x: 60, y: 20,
+      color: "#5E636C",
+      strokeWidth: 1,
+      text: questionTitle.toUpperCase(),
+      fontSize: 11,
+    } as WhiteboardElement;
+    whiteboardRef.current.addElements([title]);
+  }
 
   const stepAndSpeak = useCallback(async () => {
     if (isSteppingRef.current || endedRef.current) return;
@@ -239,7 +283,7 @@ export function VoiceAiVsAiSession({
       const res = await fetch("/api/interview/ai-vs-ai/step", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId }),
+        body: JSON.stringify({ sessionId, voiceMode: true }),
       });
       if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
 
@@ -255,15 +299,19 @@ export function VoiceAiVsAiSession({
       }
 
       const isEnd = text.includes("<<INTERVIEW_END>>");
-      const cleaned = text.replace(/<<INTERVIEW_END>>/g, "").trimEnd();
+      const cleaned = stripMermaid(text.replace(/<<INTERVIEW_END>>/g, "").trimEnd());
 
       setTranscript((prev) => [...prev, { role, content: cleaned, ts: Date.now() }]);
 
-      // Draw architectural concepts the AI mentioned
-      const drawEls = extractDrawingElements(cleaned, role, aiElementCountRef.current);
-      if (drawEls.length > 0 && whiteboardRef.current) {
-        whiteboardRef.current.addElements(drawEls);
-        aiElementCountRef.current += drawEls.length / 2; // each concept = rect + text
+      // Draw title on first ever turn, then extract components
+      maybeDrawTitle();
+      const { elements, newSlot, targetPos } = extractDrawingElements(
+        cleaned, role, usedLabelsRef.current, nextSlotRef.current,
+      );
+      if (elements.length > 0 && whiteboardRef.current) {
+        whiteboardRef.current.addElements(elements);
+        nextSlotRef.current = newSlot;
+        if (targetPos) lastDrawTargetRef.current = targetPos;
       }
 
       if (isEnd) {
@@ -280,9 +328,7 @@ export function VoiceAiVsAiSession({
         setCurrentSpeaker(role);
         speakTurn(cleaned, role, () => {
           setCurrentSpeaker(null);
-          if (isPlayingRef.current && !endedRef.current) {
-            void stepAndSpeak();
-          }
+          if (isPlayingRef.current && !endedRef.current) void stepAndSpeak();
         });
       }
     } catch (e: unknown) {
@@ -311,7 +357,7 @@ export function VoiceAiVsAiSession({
     } else {
       setIsPlaying(true);
       isPlayingRef.current = true;
-      if (!isSteppingRef.current) void stepAndSpeak();
+      if (!isSteppingRef.current && !currentSpeaker) void stepAndSpeak();
     }
   }
 
@@ -340,23 +386,6 @@ export function VoiceAiVsAiSession({
     }
   }
 
-  function handleWhiteboardChange(els: WhiteboardElements, _state: WhiteboardAppState) {
-    whiteboardElsRef.current = els;
-  }
-
-  function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHumanCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-
-  const CURSOR_IV = "#D4A574";   // amber — interviewer
-  const CURSOR_CX = "#7DA7C9";   // blue  — candidate
-  const CURSOR_HU = "#7FB48A";   // green — human
-
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-ui)" }}>
 
@@ -370,18 +399,14 @@ export function VoiceAiVsAiSession({
         </div>
         <div style={{ flex: 1 }} />
 
-        {/* Speaker indicator */}
         {currentSpeaker && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10, color: currentSpeaker === "interviewer" ? CURSOR_IV : CURSOR_CX }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor", animation: "speak-pulse 0.8s ease-in-out infinite" }} />
-            {currentSpeaker === "interviewer" ? "Interviewer speaking" : "Candidate speaking"}
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: currentSpeaker === "interviewer" ? CURSOR_IV : CURSOR_CX }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: "currentColor", animation: "speak-pulse 0.8s ease-in-out infinite" }} />
+            {currentSpeaker === "interviewer" ? "Interviewer" : "Candidate"}
           </div>
         )}
-        {isLoading && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)" }}>
-            <Loader2 style={{ width: 11, height: 11, animation: "spin 1s linear infinite" }} />
-            Thinking…
-          </div>
+        {isLoading && !currentSpeaker && (
+          <Loader2 style={{ width: 12, height: 12, color: "var(--mute)", animation: "spin 1s linear infinite" }} />
         )}
 
         {started && !ended && (
@@ -393,10 +418,9 @@ export function VoiceAiVsAiSession({
             <button
               type="button"
               onClick={stepOnce}
-              disabled={isSteppingRef.current || !!currentSpeaker || isPlaying}
+              disabled={!!currentSpeaker || isPlaying}
               className="btn btn--ghost"
               style={{ fontSize: 12, padding: "4px 10px", gap: 5 }}
-              title="One turn"
             >
               <StepForward style={{ width: 12, height: 12 }} />
               Step
@@ -409,47 +433,32 @@ export function VoiceAiVsAiSession({
         </button>
       </header>
 
-      {/* Main area: whiteboard + transcript sidebar */}
+      {/* Main: whiteboard + sidebar */}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
-        {/* Whiteboard with cursor overlay */}
+        {/* Whiteboard + cursor overlay */}
         <div
           ref={whiteboardContainerRef}
-          onMouseMove={handleMouseMove}
+          onMouseMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setHumanCursor({ x: e.clientX - r.left, y: e.clientY - r.top });
+          }}
           onMouseLeave={() => setHumanCursor(null)}
           style={{ flex: 1, minHeight: 0, minWidth: 0, position: "relative" }}
         >
-          <Whiteboard ref={whiteboardRef} onChange={handleWhiteboardChange} />
+          <Whiteboard ref={whiteboardRef} onChange={(els: WhiteboardElements, s: WhiteboardAppState) => { void els; void s; }} />
 
-          {/* Cursor overlay — pointer-events:none so canvas stays interactive */}
+          {/* Cursor overlay */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
-
-            {/* Interviewer cursor */}
             {ivCursor.visible && (
-              <div style={{ position: "absolute", left: ivCursor.x, top: ivCursor.y, transform: "translate(-2px, -2px)", transition: "left 0.15s ease-out, top 0.15s ease-out" }}>
-                <CursorIcon color={CURSOR_IV} />
-                <div style={{ position: "absolute", left: 16, top: 0, background: CURSOR_IV, color: "#1A1408", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap", letterSpacing: "0.06em" }}>
-                  INTERVIEWER
-                </div>
-              </div>
+              <CursorLabel x={ivCursor.x} y={ivCursor.y} color={CURSOR_IV} label="INTERVIEWER" />
             )}
-
-            {/* Candidate cursor */}
             {cxCursor.visible && (
-              <div style={{ position: "absolute", left: cxCursor.x, top: cxCursor.y, transform: "translate(-2px, -2px)", transition: "left 0.15s ease-out, top 0.15s ease-out" }}>
-                <CursorIcon color={CURSOR_CX} />
-                <div style={{ position: "absolute", left: 16, top: 0, background: CURSOR_CX, color: "#0D1520", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap", letterSpacing: "0.06em" }}>
-                  CANDIDATE
-                </div>
-              </div>
+              <CursorLabel x={cxCursor.x} y={cxCursor.y} color={CURSOR_CX} label="CANDIDATE" />
             )}
-
-            {/* Human cursor */}
             {humanCursor && (
-              <div style={{ position: "absolute", left: humanCursor.x + 14, top: humanCursor.y - 2, pointerEvents: "none" }}>
-                <div style={{ background: CURSOR_HU, color: "#0D1A10", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap", letterSpacing: "0.06em" }}>
-                  YOU
-                </div>
+              <div style={{ position: "absolute", left: humanCursor.x + 14, top: humanCursor.y - 2 }}>
+                <div style={{ background: CURSOR_HU, color: "#0D1A10", fontFamily: "var(--font-mono)", fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, letterSpacing: "0.06em" }}>YOU</div>
               </div>
             )}
           </div>
@@ -461,26 +470,25 @@ export function VoiceAiVsAiSession({
               background: "color-mix(in srgb, var(--bg) 85%, transparent)",
               backdropFilter: "blur(3px)",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              gap: 18, zIndex: 10,
+              gap: 16, zIndex: 10,
             }}>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>AI vs AI · Voice</div>
               <div style={{ fontSize: 20, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 400, textAlign: "center", lineHeight: 1.25 }}>{questionTitle}</div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute-2)", textAlign: "center", maxWidth: "36ch", lineHeight: 1.6 }}>
-                Two AIs interview each other with voice and draw on the whiteboard. You can draw too.
+                Two AIs interview each other with voice. Components appear on the whiteboard as they discuss. You can draw too.
               </div>
-              {/* Cursor legend */}
-              <div style={{ display: "flex", gap: 20, marginTop: 4 }}>
-                {([["INTERVIEWER", CURSOR_IV], ["CANDIDATE", CURSOR_CX], ["YOU", CURSOR_HU]] as const).map(([label, color]) => (
-                  <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--font-mono)", fontSize: 10, color }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-                    {label}
+              <div style={{ display: "flex", gap: 18, marginTop: 2 }}>
+                {([["INTERVIEWER", CURSOR_IV], ["CANDIDATE", CURSOR_CX], ["YOU", CURSOR_HU]] as const).map(([lbl, col]) => (
+                  <div key={lbl} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: col }}>
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: col }} />
+                    {lbl}
                   </div>
                 ))}
               </div>
               <button
                 type="button"
                 onClick={beginAndPlay}
-                style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 10, padding: "11px 26px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
+                style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 10, padding: "11px 26px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
               >
                 <Play style={{ width: 16, height: 16 }} />
                 Start Interview
@@ -490,20 +498,20 @@ export function VoiceAiVsAiSession({
           )}
         </div>
 
-        {/* Transcript sidebar */}
-        <aside style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", borderLeft: "1px solid var(--line)", background: "var(--bg-2)" }}>
-          <div style={{ flexShrink: 0, padding: "10px 14px 8px", borderBottom: "1px solid var(--line)", display: "flex", gap: 12 }}>
+        {/* Compact transcript sidebar */}
+        <aside style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column", borderLeft: "1px solid var(--line)", background: "var(--bg-2)" }}>
+          <div style={{ flexShrink: 0, padding: "8px 12px 6px", borderBottom: "1px solid var(--line)", display: "flex", gap: 14 }}>
             {(["interviewer", "candidate"] as const).map((r) => (
-              <div key={r} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 9.5, textTransform: "uppercase", letterSpacing: "0.08em", color: r === "interviewer" ? CURSOR_IV : CURSOR_CX }}>
-                <div style={{ width: 5, height: 5, borderRadius: "50%", background: "currentColor" }} />
+              <div key={r} style={{ display: "flex", alignItems: "center", gap: 4, fontFamily: "var(--font-mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.08em", color: r === "interviewer" ? CURSOR_IV : CURSOR_CX }}>
+                <div style={{ width: 4, height: 4, borderRadius: "50%", background: "currentColor" }} />
                 {r}
               </div>
             ))}
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 12px 6px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 10px 6px", display: "flex", flexDirection: "column", gap: 4 }}>
             {transcript.length === 0 ? (
-              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-read)", fontStyle: "italic", fontSize: 13, color: "var(--mute-2)", textAlign: "center" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-read)", fontStyle: "italic", fontSize: 12, color: "var(--mute-2)", textAlign: "center", padding: "20px 0" }}>
                 Conversation will appear here
               </div>
             ) : (
@@ -511,15 +519,18 @@ export function VoiceAiVsAiSession({
                 const isIv = msg.role === "interviewer";
                 return (
                   <div key={i} style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: isIv ? "flex-start" : "flex-end" }}>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: isIv ? CURSOR_IV : CURSOR_CX, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      {isIv ? "Interviewer" : "Candidate"}
-                    </span>
                     <div style={{
-                      maxWidth: "94%", borderRadius: isIv ? "3px 8px 8px 8px" : "8px 3px 8px 8px",
-                      padding: "7px 10px", fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                      maxWidth: "96%",
+                      borderRadius: isIv ? "2px 7px 7px 7px" : "7px 2px 7px 7px",
+                      padding: "5px 9px",
+                      fontSize: 12,
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-wrap",
                       background: isIv ? "var(--surf)" : "var(--bg)",
                       border: `1px solid ${isIv ? "var(--line)" : "var(--line-2)"}`,
-                      color: "var(--ink-2)",
+                      color: isIv ? "var(--ink-2)" : "var(--ink)",
+                      borderLeft: isIv ? `2px solid ${CURSOR_IV}` : undefined,
+                      borderRight: !isIv ? `2px solid ${CURSOR_CX}` : undefined,
                     }}>
                       {msg.content}
                     </div>
@@ -528,16 +539,16 @@ export function VoiceAiVsAiSession({
               })
             )}
             {isLoading && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 2px" }}>
-                <Loader2 style={{ width: 12, height: 12, color: "var(--mute)", animation: "spin 1s linear infinite" }} />
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)" }}>Thinking…</span>
+              <div style={{ padding: "4px 2px", display: "flex", alignItems: "center", gap: 5 }}>
+                <Loader2 style={{ width: 10, height: 10, color: "var(--mute)", animation: "spin 1s linear infinite" }} />
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--mute)" }}>Thinking…</span>
               </div>
             )}
             {error && (
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--bad)", padding: "4px 2px" }}>{error}</div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--bad)", padding: "3px 2px" }}>{error}</div>
             )}
             {ended && (
-              <div style={{ textAlign: "center", padding: "12px 0", fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+              <div style={{ textAlign: "center", padding: "10px 0", fontFamily: "var(--font-mono)", fontSize: 9, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
                 Interview ended
               </div>
             )}
@@ -548,17 +559,30 @@ export function VoiceAiVsAiSession({
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes speak-pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+        @keyframes speak-pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.25; } }
       `}</style>
     </div>
   );
 }
 
-// Minimal SVG cursor arrow
-function CursorIcon({ color }: { color: string }) {
+function CursorLabel({ x, y, color, label }: { x: number; y: number; color: string; label: string }) {
   return (
-    <svg width="16" height="20" viewBox="0 0 16 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2 2L14 8L8 10L6 16L2 2Z" fill={color} stroke="#111" strokeWidth="1" strokeLinejoin="round" />
-    </svg>
+    <div style={{
+      position: "absolute", left: x, top: y,
+      transform: "translate(-2px, -2px)",
+      transition: "left 0.12s ease-out, top 0.12s ease-out",
+    }}>
+      <svg width="14" height="18" viewBox="0 0 14 18" fill="none">
+        <path d="M2 2L12 7L7 9L5.5 14L2 2Z" fill={color} stroke="#111" strokeWidth="0.8" strokeLinejoin="round" />
+      </svg>
+      <div style={{
+        position: "absolute", left: 14, top: 0,
+        background: color, color: color === CURSOR_IV ? "#1A1408" : "#0D1520",
+        fontFamily: "var(--font-mono)", fontSize: 8, fontWeight: 700,
+        padding: "1px 4px", borderRadius: 2, whiteSpace: "nowrap", letterSpacing: "0.06em",
+      }}>
+        {label}
+      </div>
+    </div>
   );
 }

@@ -93,13 +93,14 @@ export async function POST(req: NextRequest) {
   const guard = await apiAuthGuard();
   if (guard instanceof NextResponse) return guard;
 
-  let body: { sessionId?: number } = {};
+  let body: { sessionId?: number; voiceMode?: boolean } = {};
   try {
     body = await req.json();
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
   const sessionId = Number(body.sessionId);
+  const voiceMode = body.voiceMode === true;
   if (!Number.isFinite(sessionId)) {
     return new Response("Missing sessionId", { status: 400 });
   }
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
         console.error("[ai-vs-ai] failed to load reference pdf", err);
       }
     }
-    systemText = buildInterviewerSystemPrompt(question, referenceText, pacing);
+    systemText = buildInterviewerSystemPrompt(question, referenceText, pacing, voiceMode);
     if (forceWrap) {
       systemText += `\n\n# WRAP-UP REQUIRED THIS TURN
 You have hit the hard turn cap. This is your final turn. Give a brief neutral sign-off ("Thanks, that's everything I needed.") and end with the literal token <<INTERVIEW_END>> on its own line. Do not ask any new questions.`;
@@ -164,7 +165,7 @@ You have hit the hard turn cap. This is your final turn. Give a brief neutral si
 You are past the soft turn budget. Move to wrap-up THIS turn or next: ask for a single tradeoffs/wrap question if useful, otherwise sign off and emit <<INTERVIEW_END>>.`;
     }
   } else {
-    systemText = buildCandidateSystemPrompt(question, pacing);
+    systemText = buildCandidateSystemPrompt(question, pacing, voiceMode);
     if (overSoftBudget) {
       systemText += `\n\n# OVER SOFT BUDGET
 The interview is wrapping up. Keep this turn tight — summarize tradeoffs you'd revisit and let the interviewer close out.`;
