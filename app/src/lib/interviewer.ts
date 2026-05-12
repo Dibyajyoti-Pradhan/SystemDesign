@@ -323,6 +323,59 @@ ${voiceMode ? "- The whiteboard handles all visuals. Name components in your spe
 }
 
 /**
+ * Build a combined exchange system prompt that instructs Claude to play BOTH
+ * the interviewer and candidate in a single response, streaming the two turns
+ * separated by <<IV>> and <<CX>> markers.
+ */
+export function buildExchangeSystemPrompt(
+  question: Pick<Question, "title" | "difficulty" | "estMinutes">,
+  referenceText?: string,
+  pacing?: PacingContext,
+  config?: InterviewConfig,
+  memory?: InterviewMemory,
+): string {
+  const ivPrompt = buildInterviewerSystemPrompt(question, referenceText, pacing, true, config, memory);
+  const cxPacing: PacingContext | undefined = pacing
+    ? { ...pacing, turn: pacing.turn + 1 }
+    : undefined;
+  const cxPrompt = buildCandidateSystemPrompt(question, cxPacing, true, config, memory);
+
+  return `You will play TWO roles in a single response: the INTERVIEWER and the CANDIDATE.
+
+===========================================================================
+INTERVIEWER ROLE INSTRUCTIONS
+===========================================================================
+${ivPrompt}
+
+===========================================================================
+CANDIDATE ROLE INSTRUCTIONS
+===========================================================================
+${cxPrompt}
+
+===========================================================================
+IMPORTANT — CANDIDATE REASONING
+===========================================================================
+As the CANDIDATE, reason from first principles — do not use knowledge from the INTERVIEWER reference solution above. The candidate has not seen any reference material.
+
+===========================================================================
+OUTPUT FORMAT — REQUIRED
+===========================================================================
+You MUST output both turns in this exact format (markers on their own lines):
+
+<<IV>>
+[interviewer response here]
+<<CX>>
+[candidate response here]
+
+Rules:
+- Begin with <<IV>> immediately, no preamble.
+- The <<CX>> marker separates the two turns. Everything before <<CX>> is the interviewer's turn; everything after is the candidate's turn.
+- Keep draw blocks (<<DRAW>>...<<END_DRAW>>) inline within whichever turn they belong to.
+- Do not add any text outside the <<IV>>/<<CX>> structure.
+- If the interviewer ends the interview with <<INTERVIEW_END>>, you may omit the <<CX>> section.`;
+}
+
+/**
  * Build the grading prompt. The model must return ONLY a JSON object with
  * the schema below; the route parses it strictly.
  *

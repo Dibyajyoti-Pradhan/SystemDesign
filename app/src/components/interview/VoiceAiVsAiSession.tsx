@@ -266,6 +266,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   const isSteppingRef = useRef(false);
   const lastDrawTargetRef = useRef<{ x: number; y: number } | undefined>(undefined);
   const titleDrawnRef = useRef(false);
+  const pendingCxRef = useRef<{ text: string; elements: WhiteboardElement[] } | null>(null);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { endedRef.current = ended; }, [ended]);
@@ -329,65 +330,121 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     });
   }
 
-  const stepAndSpeak = useCallback(async () => {
+  const exchangeAndSpeak = useCallback(async () => {
     if (isSteppingRef.current || endedRef.current) return;
     isSteppingRef.current = true;
     setIsLoading(true);
     setError(null);
+    pendingCxRef.current = null;
 
     try {
-      const res = await fetch("/api/interview/ai-vs-ai/step", {
+      const res = await fetch("/api/interview/ai-vs-ai/exchange", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionId, voiceMode: true }),
       });
       if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
-      const role = (res.headers.get("x-agent-role") ?? "interviewer") as "interviewer" | "candidate";
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let raw = "";
+
+      let buffer = "";
+      let ivText = "";
+      let cxText = "";
+      let phase: "waiting" | "iv" | "cx" = "waiting";
+      let ivSpeakStarted = false;
+
+      const startIvSpeech = () => {
+        const isEnd = ivText.includes("<<INTERVIEW_END>>");
+        const spoken = stripMeta(ivText.replace(/<<INTERVIEW_END>>/g, ""));
+        const drawElements = collectDrawElements(ivText, "interviewer");
+        setTranscript(prev => [...prev, { role: "interviewer", content: spoken, ts: Date.now() }]);
+
+        if (isEnd) {
+          setEnded(true); endedRef.current = true;
+          setIsPlaying(false); setSpeaker(null);
+          whiteboardRef.current?.addElements(drawElements);
+          return;
+        }
+
+        isSteppingRef.current = false;
+        setIsLoading(false);
+
+        if (!isPlayingRef.current) {
+          whiteboardRef.current?.addElements(drawElements);
+          return;
+        }
+
+        setSpeaker("interviewer");
+        applyDrawingProgressive(drawElements, spoken);
+        speakTurn(spoken, "interviewer", () => {
+          setSpeaker(null);
+          const pending = pendingCxRef.current;
+          pendingCxRef.current = null;
+          if (pending && isPlayingRef.current && !endedRef.current) {
+            setSpeaker("candidate");
+            applyDrawingProgressive(pending.elements, pending.text);
+            speakTurn(pending.text, "candidate", () => {
+              setSpeaker(null);
+              if (isPlayingRef.current && !endedRef.current) {
+                setTimeout(() => { void exchangeAndSpeak(); }, 600);
+              }
+            });
+          } else if (isPlayingRef.current && !endedRef.current) {
+            setTimeout(() => { void exchangeAndSpeak(); }, 600);
+          }
+        });
+      };
+
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        raw += decoder.decode(value, { stream: true });
-      }
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
 
-      const isEnd = raw.includes("<<INTERVIEW_END>>");
-      const spoken = stripMeta(raw.replace(/<<INTERVIEW_END>>/g, ""));
+        if (phase === "waiting") {
+          const idx = buffer.indexOf("<<IV>>");
+          if (idx !== -1) { buffer = buffer.slice(idx + 6); phase = "iv"; }
+        }
 
-      // Collect elements + update nodeMap/usedLabels NOW so cursor targets are ready.
-      const drawElements = collectDrawElements(raw, role);
-      setTranscript(prev => [...prev, { role, content: spoken, ts: Date.now() }]);
-
-      if (isEnd) {
-        setEnded(true); endedRef.current = true;
-        setIsPlaying(false); setSpeaker(null);
-      }
-
-      isSteppingRef.current = false;
-      setIsLoading(false);
-
-      const willSpeak = isPlayingRef.current && !isEnd;
-      if (!willSpeak && drawElements.length > 0) {
-        // Step-once or interview ended: no speech to pace against; draw immediately.
-        whiteboardRef.current?.addElements(drawElements);
-      }
-
-      if (willSpeak) {
-        setSpeaker(role);
-        // Drawing starts as speech starts — progressive over the duration of speech.
-        applyDrawingProgressive(drawElements, spoken);
-        speakTurn(spoken, role, () => {
-          setSpeaker(null);
-          if (isPlayingRef.current && !endedRef.current) {
-            // Brief natural pause between speakers
-            setTimeout(() => { void stepAndSpeak(); }, 600);
+        if (phase === "iv") {
+          const idx = buffer.indexOf("<<CX>>");
+          if (idx !== -1) {
+            ivText += buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 6);
+            phase = "cx";
+            if (!ivSpeakStarted) { ivSpeakStarted = true; startIvSpeech(); }
+          } else {
+            ivText += buffer; buffer = "";
           }
-        });
+        }
+
+        if (phase === "cx") {
+          cxText += buffer; buffer = "";
+        }
       }
+
+      // Stream done — handle remaining cases
+      if (phase === "iv" && !ivSpeakStarted) {
+        ivText += buffer;
+        startIvSpeech();
+      }
+
+      // Process CX if we got it
+      if (cxText.trim()) {
+        const spokenCx = stripMeta(cxText);
+        const elements = collectDrawElements(cxText, "candidate");
+        setTranscript(prev => [...prev, { role: "candidate", content: spokenCx, ts: Date.now() }]);
+        pendingCxRef.current = { text: spokenCx, elements };
+      }
+
+      if (!ivSpeakStarted) {
+        isSteppingRef.current = false;
+        setIsLoading(false);
+      }
+
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Step failed");
+      setError(e instanceof Error ? e.message : "Exchange failed");
       setIsPlaying(false); setSpeaker(null);
       isSteppingRef.current = false; setIsLoading(false);
     }
@@ -395,7 +452,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
 
   function beginAndPlay() {
     setStarted(true); setIsPlaying(true); isPlayingRef.current = true;
-    void stepAndSpeak();
+    void exchangeAndSpeak();
   }
   function togglePlay() {
     if (ended) return;
@@ -404,13 +461,13 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       window.speechSynthesis?.cancel(); setSpeaker(null);
     } else {
       setIsPlaying(true); isPlayingRef.current = true;
-      if (!isSteppingRef.current && !speaker) void stepAndSpeak();
+      if (!isSteppingRef.current && !speaker) void exchangeAndSpeak();
     }
   }
-  function stepOnce() {
+  function exchangeOnce() {
     if (ended || isSteppingRef.current || speaker) return;
     setIsPlaying(false); isPlayingRef.current = false;
-    void stepAndSpeak();
+    void exchangeAndSpeak();
   }
   async function endSession() {
     if (!confirm("End session and score it?")) return;
@@ -447,7 +504,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
               {isPlaying ? <Pause style={{ width: 12, height: 12 }} /> : <Play style={{ width: 12, height: 12 }} />}
               {isPlaying ? "Pause" : "Play"}
             </button>
-            <button type="button" onClick={stepOnce} disabled={!!speaker || isPlaying} className="btn btn--ghost" style={{ fontSize: 12, padding: "4px 10px", gap: 5 }}>
+            <button type="button" onClick={exchangeOnce} disabled={!!speaker || isPlaying} className="btn btn--ghost" style={{ fontSize: 12, padding: "4px 10px", gap: 5 }}>
               <StepForward style={{ width: 12, height: 12 }} />Step
             </button>
           </>
