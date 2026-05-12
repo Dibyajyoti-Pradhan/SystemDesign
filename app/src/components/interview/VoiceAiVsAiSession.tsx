@@ -291,13 +291,15 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     } as WhiteboardElement]);
   }
 
-  function applyDrawing(raw: string, role: "interviewer" | "candidate") {
-    if (!whiteboardRef.current) return;
-    drawTitleOnce();
+  // Build the element list and update nodeMap/usedLabels immediately (so the
+  // cursor animation can target the first new node), but don't push the
+  // elements onto the whiteboard yet — that happens progressively during
+  // speech via applyDrawingProgressive.
+  function collectDrawElements(raw: string, role: "interviewer" | "candidate"): WhiteboardElement[] {
+    if (whiteboardRef.current) drawTitleOnce();
 
     let cmd = parseDrawCmd(raw);
     if (!cmd || (!(cmd.boxes?.length) && !(cmd.arrows?.length))) {
-      // Fallback: extract keywords from spoken text
       const spoken = stripMeta(raw);
       const fb = fallbackCmd(spoken, usedLabelsRef.current);
       if (fb.boxes && fb.boxes.length > 0) {
@@ -305,13 +307,26 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         cmd = { boxes: positioned, arrows: [] };
       }
     }
-    if (!cmd) return;
+    if (!cmd) return [];
 
     const { elements, firstNewPos } = buildElements(cmd, role, nodeMapRef.current, usedLabelsRef.current);
-    if (elements.length > 0) {
-      whiteboardRef.current.addElements(elements);
-      if (firstNewPos) lastDrawTargetRef.current = firstNewPos;
-    }
+    if (firstNewPos) lastDrawTargetRef.current = firstNewPos;
+    return elements;
+  }
+
+  function applyDrawingProgressive(elements: WhiteboardElement[], spokenText: string) {
+    if (!whiteboardRef.current || elements.length === 0) return;
+    const wordCount = spokenText.split(/\s+/).filter(Boolean).length;
+    const estimatedMs = Math.max(4000, (wordCount / 150) * 60 * 1000); // ~150 wpm
+    const usableMs = estimatedMs * 0.8; // don't go past 80% of speech
+    elements.forEach((el, i) => {
+      const delay = i === 0
+        ? 800
+        : Math.min(1500 + (i / elements.length) * usableMs, usableMs);
+      setTimeout(() => {
+        whiteboardRef.current?.addElements([el]);
+      }, delay);
+    });
   }
 
   const stepAndSpeak = useCallback(async () => {
@@ -341,7 +356,8 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       const isEnd = raw.includes("<<INTERVIEW_END>>");
       const spoken = stripMeta(raw.replace(/<<INTERVIEW_END>>/g, ""));
 
-      applyDrawing(raw, role);
+      // Collect elements + update nodeMap/usedLabels NOW so cursor targets are ready.
+      const drawElements = collectDrawElements(raw, role);
       setTranscript(prev => [...prev, { role, content: spoken, ts: Date.now() }]);
 
       if (isEnd) {
@@ -352,8 +368,16 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       isSteppingRef.current = false;
       setIsLoading(false);
 
-      if (isPlayingRef.current && !isEnd) {
+      const willSpeak = isPlayingRef.current && !isEnd;
+      if (!willSpeak && drawElements.length > 0) {
+        // Step-once or interview ended: no speech to pace against; draw immediately.
+        whiteboardRef.current?.addElements(drawElements);
+      }
+
+      if (willSpeak) {
         setSpeaker(role);
+        // Drawing starts as speech starts — progressive over the duration of speech.
+        applyDrawingProgressive(drawElements, spoken);
         speakTurn(spoken, role, () => {
           setSpeaker(null);
           if (isPlayingRef.current && !endedRef.current) {
