@@ -39,6 +39,7 @@ export function VoiceInterviewSession({
   firstInterviewerMessage,
 }: VoiceInterviewSessionProps) {
   const router = useRouter();
+  const [started, setStarted] = useState(false);
   const [transcript, setTranscript] = useState<Message[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -187,8 +188,7 @@ export function VoiceInterviewSession({
     }
   }, [isListening]);
 
-  // Speak the opening message as soon as voices are loaded (speakWhenReady
-  // queues it if voices aren't available yet — no click required).
+  // Populate transcript on mount (no audio yet — browser requires user gesture).
   useEffect(() => {
     if (hasMountedRef.current) return;
     hasMountedRef.current = true;
@@ -196,9 +196,14 @@ export function VoiceInterviewSession({
       setTranscript([
         { role: "interviewer", content: firstInterviewerMessage, timestamp: new Date() },
       ]);
-      speakWhenReady(firstInterviewerMessage);
     }
-  }, [firstInterviewerMessage, speakWhenReady]);
+  }, [firstInterviewerMessage]);
+
+  // Called from the start overlay — this IS a user gesture so speech is allowed.
+  function startSession() {
+    setStarted(true);
+    if (firstInterviewerMessage) speakWhenReady(firstInterviewerMessage);
+  }
 
   async function endSession() {
     if (!confirm("End this voice interview and get a score?")) return;
@@ -252,6 +257,26 @@ export function VoiceInterviewSession({
 
   const combinedError = error ?? sttError;
   const micDisabled = status === "thinking" || status === "speaking";
+
+  if (!started) {
+    return (
+      <div
+        onClick={startSession}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--bg)", cursor: "pointer", gap: 20, userSelect: "none" }}
+      >
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>CareerLab · Voice Interview</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 420, textAlign: "center" }}>{questionTitle}</div>
+        <button
+          type="button"
+          style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 28px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", letterSpacing: "-0.01em" }}
+        >
+          <Mic style={{ width: 16, height: 16 }} />
+          Begin Interview
+        </button>
+        <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)", marginTop: 4 }}>Interviewer will speak when you click</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-ui)" }}>
