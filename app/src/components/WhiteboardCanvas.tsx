@@ -912,9 +912,9 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
   };
 
   return (
-    <div className="flex flex-col h-full w-full" style={{ background: CANVAS_BG }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", background: CANVAS_BG }}>
       {/* Toolbar */}
-      <div className="shrink-0 h-10 flex items-center gap-1 px-2" style={{ background: "#1c1c1c", borderBottom: "1px solid #333" }}>
+      <div className="shrink-0 h-10 flex items-center gap-1 px-2" style={{ background: "var(--surf)", borderBottom: "1px solid var(--line)" }}>
         {toolButtons.map(({ tool: t, label, key, Icon }) => {
           const active = tool === t;
           return (
@@ -924,18 +924,19 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
               onClick={() => setTool(t)}
               title={`${label} (${key})`}
               disabled={readOnly}
-              className={`inline-flex items-center justify-center w-8 h-8 rounded border text-sm transition-colors ${
-                active
-                  ? "border-blue-400 bg-blue-400/20 text-blue-400"
-                  : "border-transparent text-zinc-300 hover:bg-zinc-700"
-              }`}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 4, fontSize: 13, border: active ? "1px solid var(--accent)" : "1px solid transparent",
+                background: active ? "color-mix(in srgb, var(--accent) 15%, transparent)" : "transparent",
+                color: active ? "var(--accent)" : "var(--ink-2)", cursor: "pointer", transition: "background 0.1s",
+              }}
             >
               <Icon className="h-4 w-4" />
             </button>
           );
         })}
 
-        <div className="mx-1 h-5 w-px bg-zinc-600" />
+        <div style={{ width: 1, height: 18, background: "var(--line-2)", margin: "0 2px", flexShrink: 0 }} />
 
         {/* Color swatches */}
         {COLORS.map((c) => (
@@ -945,71 +946,35 @@ export function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanva
             onClick={() => setColor(c)}
             title={c}
             disabled={readOnly}
-            className={`w-5 h-5 rounded-full border transition-transform ${
-              color === c ? "ring-2 ring-offset-1 ring-primary scale-110" : "border-input"
-            }`}
-            style={{ backgroundColor: c }}
+            style={{ width: 18, height: 18, borderRadius: "50%", border: color === c ? "2px solid var(--accent)" : "1px solid var(--line-2)", transform: color === c ? "scale(1.15)" : "scale(1)", transition: "transform 0.1s", cursor: "pointer", backgroundColor: c, outline: color === c ? "2px solid color-mix(in srgb, var(--accent) 30%, transparent)" : "none", outlineOffset: 1 }}
           />
         ))}
 
-        <div className="mx-1 h-5 w-px bg-zinc-600" />
+        <div style={{ width: 1, height: 18, background: "var(--line-2)", margin: "0 2px", flexShrink: 0 }} />
 
         {/* Stroke width */}
-        <button
-          type="button"
-          onClick={() => setStrokeWidth(STROKE_THIN)}
-          title="Thin stroke"
-          disabled={readOnly}
-          className={`inline-flex items-center justify-center w-8 h-8 rounded border ${
-            strokeWidth === STROKE_THIN
-              ? "border-blue-400 bg-blue-400/20 text-blue-400"
-              : "border-transparent text-zinc-300 hover:bg-zinc-700"
-          }`}
-        >
-          <span className="block w-4 h-[2px] bg-current" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setStrokeWidth(STROKE_THICK)}
-          title="Thick stroke"
-          disabled={readOnly}
-          className={`inline-flex items-center justify-center w-8 h-8 rounded border ${
-            strokeWidth === STROKE_THICK
-              ? "border-blue-400 bg-blue-400/20 text-blue-400"
-              : "border-transparent text-zinc-300 hover:bg-zinc-700"
-          }`}
-        >
-          <span className="block w-4 h-[5px] bg-current rounded-sm" />
-        </button>
+        {([STROKE_THIN, STROKE_THICK] as const).map((sw) => {
+          const active = strokeWidth === sw;
+          return (
+            <button key={sw} type="button" onClick={() => setStrokeWidth(sw)} title={sw === STROKE_THIN ? "Thin" : "Thick"} disabled={readOnly}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 4, border: active ? "1px solid var(--accent)" : "1px solid transparent", background: active ? "color-mix(in srgb, var(--accent) 15%, transparent)" : "transparent", color: active ? "var(--accent)" : "var(--ink-2)", cursor: "pointer" }}>
+              <span style={{ display: "block", width: 14, height: sw === STROKE_THIN ? 2 : 5, background: "currentColor", borderRadius: 2 }} />
+            </button>
+          );
+        })}
 
-        <div className="mx-1 h-5 w-px bg-zinc-600" />
+        <div style={{ width: 1, height: 18, background: "var(--line-2)", margin: "0 2px", flexShrink: 0 }} />
 
-        <button
-          type="button"
-          onClick={undo}
-          disabled={readOnly}
-          title="Undo (Ctrl+Z)"
-          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent text-zinc-300 hover:bg-zinc-700"
-        >
-          <Undo2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={redo}
-          disabled={readOnly}
-          title="Redo (Ctrl+Shift+Z)"
-          className="inline-flex items-center justify-center w-8 h-8 rounded border border-transparent text-zinc-300 hover:bg-zinc-700"
-        >
-          <Redo2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={clearAll}
-          disabled={readOnly}
-          title="Clear canvas"
-          className="ml-auto inline-flex items-center gap-1 px-2 h-8 rounded text-xs text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200" style={{ border: "1px solid #444" }}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
+        {[{ fn: undo, icon: <Undo2 style={{ width: 14, height: 14 }} />, title: "Undo (Ctrl+Z)" }, { fn: redo, icon: <Redo2 style={{ width: 14, height: 14 }} />, title: "Redo (Ctrl+Shift+Z)" }].map(({ fn, icon, title }) => (
+          <button key={title} type="button" onClick={fn} disabled={readOnly} title={title}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 4, border: "1px solid transparent", background: "transparent", color: "var(--ink-2)", cursor: "pointer" }}>
+            {icon}
+          </button>
+        ))}
+
+        <button type="button" onClick={clearAll} disabled={readOnly} title="Clear canvas"
+          style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 5, padding: "0 10px", height: 28, borderRadius: 4, border: "1px solid var(--line-2)", background: "transparent", color: "var(--mute)", fontSize: 11, fontFamily: "var(--font-mono)", cursor: "pointer", letterSpacing: "0.05em" }}>
+          <Trash2 style={{ width: 12, height: 12 }} />
           Clear
         </button>
       </div>

@@ -260,68 +260,65 @@ export function VoiceInterviewSession({
   const micDisabled = status === "thinking" || status === "speaking";
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      {/* Top bar */}
-      <header className="shrink-0 border-b px-4 py-2 flex items-center gap-3 bg-background">
-        <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-          CareerLab
-        </span>
-        <span className="text-sm font-semibold flex-1 truncate">{questionTitle}</span>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-ui)" }}>
+      {/* Top bar — matches .topbar pattern */}
+      <header style={{ flexShrink: 0, height: 44, display: "flex", alignItems: "center", padding: "0 18px", borderBottom: "1px solid var(--line)", gap: 14, background: "var(--bg)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="crumbs">
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.1em" }}>CareerLab</span>
+          <span style={{ color: "var(--subtle)" }}>›</span>
+          <b style={{ color: "var(--ink-2)", fontWeight: 500, fontSize: 13, letterSpacing: "-0.005em", maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{questionTitle}</b>
+        </div>
+        <div style={{ flex: 1 }} />
         <button
           type="button"
           onClick={() => setHintLevel((h) => ((h + 1) % 4) as HintLevel)}
-          className={`inline-flex items-center gap-1 text-xs font-mono px-2.5 py-1 rounded border transition-colors ${
-            hintLevel > 0
-              ? "border-primary text-primary"
-              : "border-input text-muted-foreground hover:text-foreground hover:bg-accent"
-          }`}
+          className="btn btn--ghost"
+          style={{ fontSize: 12, padding: "4px 10px", gap: 5, color: hintLevel > 0 ? "var(--accent)" : undefined }}
           title="Cycle hint level"
         >
-          <Lightbulb className="h-3 w-3" />
+          <Lightbulb style={{ width: 12, height: 12 }} />
           {hintLevel === 0 ? "Hint" : `Hint L${hintLevel}`}
         </button>
-        <button
-          type="button"
-          onClick={endSession}
-          className="inline-flex items-center gap-1 text-xs px-3 py-1 rounded border border-input hover:bg-accent"
-        >
-          <X className="h-3 w-3" />
+        <button type="button" onClick={endSession} className="btn" style={{ fontSize: 12, padding: "4px 10px", gap: 5 }}>
+          <X style={{ width: 12, height: 12 }} />
           End
         </button>
       </header>
 
       {/* Main area */}
-      <div className="flex flex-1 min-h-0">
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
         {/* Whiteboard */}
-        <div className="flex-1 min-h-0" style={{ minHeight: 300 }}>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           <Whiteboard onChange={handleWhiteboardChange} />
         </div>
 
         {/* Transcript sidebar */}
-        <aside className="w-80 shrink-0 flex flex-col border-l bg-background">
-          <div className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2.5">
+        <aside style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", borderLeft: "1px solid var(--line)", background: "var(--bg-2)" }}>
+          {/* Sidebar header */}
+          <div style={{ flexShrink: 0, padding: "10px 16px 8px", borderBottom: "1px solid var(--line)" }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Interviewer</span>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 14px 6px", display: "flex", flexDirection: "column", gap: 10 }}>
             {transcript.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-sm italic text-muted-foreground">
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-read)", fontStyle: "italic", fontSize: 13, color: "var(--mute-2)" }}>
                 Conversation will appear here
               </div>
             ) : (
               transcript.map((msg, i) => {
                 const isIv = msg.role === "interviewer";
                 return (
-                  <div
-                    key={i}
-                    className={`flex flex-col gap-1 ${isIv ? "items-start" : "items-end"}`}
-                  >
-                    <span className="text-[9.5px] font-mono uppercase tracking-widest text-muted-foreground">
+                  <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: isIv ? "flex-start" : "flex-end" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--mute-2)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                       {isIv ? "Interviewer" : "You"}
                     </span>
-                    <div
-                      className={`max-w-[90%] rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap ${
-                        isIv
-                          ? "bg-muted text-foreground rounded-tl-sm"
-                          : "bg-primary text-primary-foreground rounded-tr-sm"
-                      }`}
-                    >
+                    <div style={{
+                      maxWidth: "92%", borderRadius: isIv ? "3px 10px 10px 10px" : "10px 3px 10px 10px",
+                      padding: "8px 12px", fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap",
+                      background: isIv ? "var(--surf)" : "var(--accent)",
+                      color: isIv ? "var(--ink-2)" : "var(--accent-ink)",
+                    }}>
                       {msg.content}
                     </div>
                   </div>
@@ -329,17 +326,15 @@ export function VoiceInterviewSession({
               })
             )}
             {isListening && interimTranscript && (
-              <div className="text-xs italic text-muted-foreground px-3 py-1">
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", fontStyle: "italic", padding: "2px 4px" }}>
                 {interimTranscript}
               </div>
             )}
             {status === "thinking" && (
-              <div className="flex flex-col gap-1 items-start">
-                <span className="text-[9.5px] font-mono uppercase tracking-widest text-muted-foreground">
-                  Interviewer
-                </span>
-                <div className="max-w-[90%] rounded-lg rounded-tl-sm px-3 py-2 bg-muted">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, color: "var(--mute-2)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Interviewer</span>
+                <div style={{ background: "var(--surf)", borderRadius: "3px 10px 10px 10px", padding: "8px 12px" }}>
+                  <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} />
                 </div>
               </div>
             )}
@@ -347,37 +342,43 @@ export function VoiceInterviewSession({
           </div>
 
           {combinedError && (
-            <div className="shrink-0 text-xs font-mono text-destructive px-4 py-1.5 border-t">
+            <div style={{ flexShrink: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--bad)", padding: "6px 16px 8px", borderTop: "1px solid var(--line)" }}>
               {combinedError}
             </div>
           )}
 
           {/* Voice strip */}
-          <div className="shrink-0 border-t px-4 py-3 flex items-center gap-3 bg-background">
+          <div style={{ flexShrink: 0, borderTop: "1px solid var(--line)", padding: "12px 14px", display: "flex", alignItems: "center", gap: 10, background: "var(--surf)" }}>
             <button
               type="button"
               onClick={toggleMic}
-              title={isListening ? "Stop recording" : "Start recording"}
+              title={isListening ? "Stop" : "Speak"}
               disabled={micDisabled}
-              className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-colors ${
-                isListening
-                  ? "bg-destructive text-destructive-foreground animate-pulse"
-                  : micDisabled
-                    ? "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                    : "bg-muted text-foreground hover:bg-accent"
-              }`}
+              style={{
+                width: 40, height: 40, borderRadius: "50%", border: "none", cursor: micDisabled ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s",
+                background: isListening ? "var(--bad)" : "var(--surf-3)",
+                color: isListening ? "#fff" : "var(--ink)",
+                opacity: micDisabled ? 0.4 : 1,
+                animation: isListening ? "mic-pulse 1s ease-in-out infinite" : undefined,
+              }}
             >
-              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {isListening ? <MicOff style={{ width: 18, height: 18 }} /> : <Mic style={{ width: 18, height: 18 }} />}
             </button>
-            <span className="flex-1 text-xs font-mono text-muted-foreground">
+            <span style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)" }}>
               {statusText[status]}
             </span>
             {isSpeaking && (
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" />
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", animation: "speak-pulse 0.8s ease-in-out infinite", flexShrink: 0 }} />
             )}
           </div>
         </aside>
       </div>
+      <style>{`
+        @keyframes mic-pulse { 0%,100%{ box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 25%, transparent); } 50%{ box-shadow: 0 0 0 8px color-mix(in srgb, var(--bad) 10%, transparent); } }
+        @keyframes speak-pulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
