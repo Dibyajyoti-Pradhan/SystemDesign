@@ -2,19 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { Play, Pause, StepForward, X, Loader2, Bot } from "lucide-react";
-import {
-  type WhiteboardHandle,
-  type WhiteboardElements,
-  type WhiteboardAppState,
-} from "@/components/Whiteboard";
+// Direct import (no dynamic) so forwardRef on Whiteboard works — dynamic() wrappers
+// don't forward refs to the inner component, which broke whiteboardRef.current.
+import { Whiteboard, type WhiteboardHandle, type WhiteboardElements, type WhiteboardAppState } from "@/components/Whiteboard";
 import { type WhiteboardElement } from "@/components/WhiteboardCanvas";
-
-const Whiteboard = dynamic(
-  () => import("@/components/Whiteboard").then((m) => ({ default: m.Whiteboard })),
-  { ssr: false },
-);
+import { Play, Pause, StepForward, X, Loader2, Bot } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,22 +25,18 @@ interface Props {
 // Draw command parsing
 // ---------------------------------------------------------------------------
 
-interface DrawBox {
-  id: string;
-  label: string;
-  c: number;  // col 0-5
-  r: number;  // row 0-4
-  style?: "note";
-}
-interface DrawArrow { from: string; to: string; label?: string; }
+interface DrawBox { id: string; label: string; c: number; r: number; style?: "note"; }
+interface DrawArrow { from: string; to: string; }
 interface DrawCmd { boxes?: DrawBox[]; arrows?: DrawArrow[]; }
 
 const DRAW_RE = /<<DRAW>>([\s\S]*?)<<END_DRAW>>/;
 
-function parseDrawCmd(text: string): DrawCmd | null {
-  const m = text.match(DRAW_RE);
+function parseDrawCmd(raw: string): DrawCmd | null {
+  const m = raw.match(DRAW_RE);
   if (!m) return null;
-  try { return JSON.parse(m[1].trim()) as DrawCmd; } catch { return null; }
+  // Claude sometimes wraps JSON in code fences inside the block — strip them
+  const inner = m[1].replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
+  try { return JSON.parse(inner) as DrawCmd; } catch { return null; }
 }
 
 function stripMeta(text: string): string {
@@ -57,6 +45,30 @@ function stripMeta(text: string): string {
     .replace(/```mermaid[\s\S]*?```/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// Fallback: extract known arch terms when no <<DRAW>> block found
+const FALLBACK_TERMS: [string, string][] = [
+  ["load balancer", "Load Balancer"], ["api gateway", "API Gateway"],
+  ["cdn", "CDN"], ["cache", "Cache"], ["redis", "Redis"],
+  ["database", "Database"], ["postgres", "Postgres"], ["mysql", "MySQL"],
+  ["cassandra", "Cassandra"], ["dynamodb", "DynamoDB"],
+  ["message queue", "Message Queue"], ["kafka", "Kafka"], ["sqs", "SQS"],
+  ["worker", "Workers"], ["app server", "App Server"], ["app tier", "App Tier"],
+  ["object storage", "Object Storage"], ["s3", "S3"],
+  ["rate limit", "Rate Limiter"], ["auth", "Auth Service"],
+  ["search", "Search"], ["elasticsearch", "Elasticsearch"],
+];
+
+function fallbackCmd(text: string, usedLabels: Set<string>): DrawCmd {
+  const lower = text.toLowerCase();
+  const boxes: DrawBox[] = [];
+  for (const [kw, label] of FALLBACK_TERMS) {
+    if (lower.includes(kw) && !usedLabels.has(label) && boxes.length < 3) {
+      boxes.push({ id: label.toLowerCase().replace(/\s+/g, "_"), label, c: 0, r: 0 });
+    }
+  }
+  return { boxes, arrows: [] };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,10 +90,27 @@ function gridBox(c: number, r: number): NodeRect {
   return { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2, w: BOX_W, h: BOX_H };
 }
 
-// Arrow from near-edge of src to near-edge of dst
+// Auto-assign grid position for fallback terms
+function assignFallbackPositions(boxes: DrawBox[], nodeMap: Map<string, NodeRect>): DrawBox[] {
+  const takenSlots = new Set<string>();
+  for (const [, rect] of nodeMap) {
+    // find closest grid slot to existing rect
+    const c = Math.round((rect.x - GRID_X) / CELL_W);
+    const r = Math.round((rect.y - GRID_Y) / CELL_H);
+    takenSlots.add(`${c},${r}`);
+  }
+  let slot = 0;
+  return boxes.map(box => {
+    while (takenSlots.has(`${slot % 6},${Math.floor(slot / 6)}`)) slot++;
+    const c = slot % 6;
+    const r = Math.min(4, Math.floor(slot / 6));
+    slot++;
+    return { ...box, c, r };
+  });
+}
+
 function arrowEndpoints(src: NodeRect, dst: NodeRect): [number, number, number, number] {
-  const dx = dst.cx - src.cx;
-  const dy = dst.cy - src.cy;
+  const dx = dst.cx - src.cx, dy = dst.cy - src.cy;
   const horiz = Math.abs(dx) >= Math.abs(dy);
   const sx = horiz ? (dx > 0 ? src.x + src.w : src.x) : src.cx;
   const sy = horiz ? src.cy : (dy > 0 ? src.y + src.h : src.y);
@@ -94,14 +123,18 @@ function buildElements(
   cmd: DrawCmd,
   role: "interviewer" | "candidate",
   nodeMap: Map<string, NodeRect>,
-): WhiteboardElement[] {
+  usedLabels: Set<string>,
+): { elements: WhiteboardElement[]; firstNewPos: { x: number; y: number } | null } {
   const color = role === "interviewer" ? "#D4A574" : "#7DA7C9";
   const els: WhiteboardElement[] = [];
+  let firstNewPos: { x: number; y: number } | null = null;
 
   for (const box of (cmd.boxes ?? [])) {
-    if (nodeMap.has(box.id)) continue; // already drawn
+    if (nodeMap.has(box.id)) continue;
     const rect = gridBox(Math.max(0, Math.min(5, box.c)), Math.max(0, Math.min(4, box.r)));
     nodeMap.set(box.id, rect);
+    usedLabels.add(box.label);
+    if (!firstNewPos) firstNewPos = { x: rect.cx, y: rect.cy };
 
     els.push({
       id: `box-${box.id}`,
@@ -113,15 +146,12 @@ function buildElements(
       strokeWidth: box.style === "note" ? 1 : 1.8,
     } as WhiteboardElement);
 
-    // Label — center-ish
     els.push({
       id: `lbl-${box.id}`,
       type: "text",
       x: rect.x + 10, y: rect.y + 18,
-      color,
-      strokeWidth: 1,
-      text: box.label,
-      fontSize: 13,
+      color, strokeWidth: 1,
+      text: box.label, fontSize: 13,
     } as WhiteboardElement);
   }
 
@@ -134,12 +164,11 @@ function buildElements(
       id: `arr-${arrow.from}-${arrow.to}-${Date.now()}`,
       type: "arrow",
       x, y, endX, endY,
-      color,
-      strokeWidth: 1.5,
+      color, strokeWidth: 1.5,
     } as WhiteboardElement);
   }
 
-  return els;
+  return { elements: els, firstNewPos };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +199,7 @@ function speakTurn(text: string, role: "interviewer" | "candidate", onEnd: () =>
 }
 
 // ---------------------------------------------------------------------------
-// Cursor animation — eases to target then wanders
+// Cursor animation
 // ---------------------------------------------------------------------------
 
 function animateCursor(
@@ -184,7 +213,6 @@ function animateCursor(
   let phase: "goto" | "wander" = target ? "goto" : "wander";
   let lastPick = 0;
   const raf = { id: 0 };
-
   function tick(now: number) {
     if (stopRef.current) { set({ x: cx, y: cy, visible: false }); return; }
     if (phase === "goto") {
@@ -192,8 +220,8 @@ function animateCursor(
       if (Math.hypot(tx - cx, ty - cy) < 6) phase = "wander";
     } else {
       if (now - lastPick > 900 + Math.random() * 900) {
-        tx = Math.max(40, Math.min(bounds.w - 40, tx + (Math.random() - 0.5) * 280));
-        ty = Math.max(40, Math.min(bounds.h - 40, ty + (Math.random() - 0.5) * 180));
+        tx = Math.max(40, Math.min(bounds.w - 40, tx + (Math.random() - 0.5) * 260));
+        ty = Math.max(40, Math.min(bounds.h - 40, ty + (Math.random() - 0.5) * 160));
         lastPick = now;
       }
       cx += (tx - cx) * 0.07; cy += (ty - cy) * 0.07;
@@ -205,13 +233,9 @@ function animateCursor(
   return () => cancelAnimationFrame(raf.id);
 }
 
-// ---------------------------------------------------------------------------
-// Colors
-// ---------------------------------------------------------------------------
-
-const IV = "#D4A574"; // interviewer — amber
-const CX = "#7DA7C9"; // candidate   — blue
-const HU = "#7FB48A"; // human       — green
+const IV = "#D4A574";
+const CX = "#7DA7C9";
+const HU = "#7FB48A";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -222,6 +246,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   const whiteboardRef = useRef<WhiteboardHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeMapRef = useRef<Map<string, NodeRect>>(new Map());
+  const usedLabelsRef = useRef<Set<string>>(new Set());
 
   const [transcript, setTranscript] = useState<Msg[]>(initialTranscript);
   const [started, setStarted] = useState(false);
@@ -246,7 +271,6 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   useEffect(() => { endedRef.current = ended; }, [ended]);
   useEffect(() => { transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [transcript.length]);
 
-  // Animate active speaker's cursor toward last drawn element
   useEffect(() => {
     if (!speaker) return;
     const w = containerRef.current?.clientWidth ?? 800;
@@ -261,14 +285,33 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     if (titleDrawnRef.current || !whiteboardRef.current) return;
     titleDrawnRef.current = true;
     whiteboardRef.current.addElements([{
-      id: "q-title",
-      type: "text",
-      x: GRID_X, y: 18,
-      color: "#5E636C",
-      strokeWidth: 1,
-      text: questionTitle.toUpperCase(),
-      fontSize: 11,
+      id: "q-title", type: "text",
+      x: GRID_X, y: 20, color: "#5E636C",
+      strokeWidth: 1, text: questionTitle.toUpperCase(), fontSize: 11,
     } as WhiteboardElement]);
+  }
+
+  function applyDrawing(raw: string, role: "interviewer" | "candidate") {
+    if (!whiteboardRef.current) return;
+    drawTitleOnce();
+
+    let cmd = parseDrawCmd(raw);
+    if (!cmd || (!(cmd.boxes?.length) && !(cmd.arrows?.length))) {
+      // Fallback: extract keywords from spoken text
+      const spoken = stripMeta(raw);
+      const fb = fallbackCmd(spoken, usedLabelsRef.current);
+      if (fb.boxes && fb.boxes.length > 0) {
+        const positioned = assignFallbackPositions(fb.boxes, nodeMapRef.current);
+        cmd = { boxes: positioned, arrows: [] };
+      }
+    }
+    if (!cmd) return;
+
+    const { elements, firstNewPos } = buildElements(cmd, role, nodeMapRef.current, usedLabelsRef.current);
+    if (elements.length > 0) {
+      whiteboardRef.current.addElements(elements);
+      if (firstNewPos) lastDrawTargetRef.current = firstNewPos;
+    }
   }
 
   const stepAndSpeak = useCallback(async () => {
@@ -298,22 +341,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       const isEnd = raw.includes("<<INTERVIEW_END>>");
       const spoken = stripMeta(raw.replace(/<<INTERVIEW_END>>/g, ""));
 
-      // Draw on whiteboard
-      drawTitleOnce();
-      const cmd = parseDrawCmd(raw);
-      if (cmd && whiteboardRef.current) {
-        const els = buildElements(cmd, role, nodeMapRef.current);
-        if (els.length > 0) {
-          whiteboardRef.current.addElements(els);
-          // Aim cursor at first new box's center
-          const firstBox = (cmd.boxes ?? []).find(b => nodeMapRef.current.has(b.id));
-          if (firstBox) {
-            const pos = nodeMapRef.current.get(firstBox.id);
-            if (pos) lastDrawTargetRef.current = { x: pos.cx, y: pos.cy };
-          }
-        }
-      }
-
+      applyDrawing(raw, role);
       setTranscript(prev => [...prev, { role, content: spoken, ts: Date.now() }]);
 
       if (isEnd) {
@@ -328,7 +356,10 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         setSpeaker(role);
         speakTurn(spoken, role, () => {
           setSpeaker(null);
-          if (isPlayingRef.current && !endedRef.current) void stepAndSpeak();
+          if (isPlayingRef.current && !endedRef.current) {
+            // Brief natural pause between speakers
+            setTimeout(() => { void stepAndSpeak(); }, 600);
+          }
         });
       }
     } catch (e: unknown) {
@@ -373,8 +404,6 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", background: "var(--bg)", color: "var(--ink)", fontFamily: "var(--font-ui)" }}>
-
-      {/* Header */}
       <header style={{ flexShrink: 0, height: 44, display: "flex", alignItems: "center", padding: "0 18px", borderBottom: "1px solid var(--line)", gap: 12, background: "var(--bg)" }}>
         <Bot style={{ width: 14, height: 14, color: "var(--mute)" }} />
         <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.1em" }}>AI vs AI</span>
@@ -384,7 +413,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         {speaker && (
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: speaker === "interviewer" ? IV : CX }}>
             <div style={{ width: 5, height: 5, borderRadius: "50%", background: "currentColor", animation: "speak-pulse 0.8s ease-in-out infinite" }} />
-            {speaker === "interviewer" ? "Interviewer" : "Candidate"}
+            {speaker === "interviewer" ? "Interviewer speaking" : "Candidate speaking"}
           </div>
         )}
         {isLoading && !speaker && <Loader2 style={{ width: 12, height: 12, color: "var(--mute)", animation: "spin 1s linear infinite" }} />}
@@ -404,10 +433,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         </button>
       </header>
 
-      {/* Body */}
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-
-        {/* Whiteboard + cursors */}
         <div
           ref={containerRef}
           onMouseMove={e => { const r = e.currentTarget.getBoundingClientRect(); setHumanCursor({ x: e.clientX - r.left, y: e.clientY - r.top }); }}
@@ -416,7 +442,6 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         >
           <Whiteboard ref={whiteboardRef} onChange={(_els: WhiteboardElements, _s: WhiteboardAppState) => {}} />
 
-          {/* Cursor overlay — pointer-events:none so canvas stays interactive */}
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
             {ivCursor.visible && <Cursor x={ivCursor.x} y={ivCursor.y} color={IV} label="INTERVIEWER" />}
             {cxCursor.visible && <Cursor x={cxCursor.x} y={cxCursor.y} color={CX} label="CANDIDATE" />}
@@ -427,19 +452,17 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
             )}
           </div>
 
-          {/* Begin overlay */}
           {!started && (
             <div style={{ position: "absolute", inset: 0, background: "color-mix(in srgb, var(--bg) 85%, transparent)", backdropFilter: "blur(3px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, zIndex: 10 }}>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>AI vs AI · Voice</div>
               <div style={{ fontSize: 20, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 420, textAlign: "center", lineHeight: 1.25 }}>{questionTitle}</div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute-2)", textAlign: "center", maxWidth: "38ch", lineHeight: 1.65 }}>
-                Two AIs interview each other. The candidate draws the architecture live as they discuss.
+                Two AIs interview each other. Architecture builds on the whiteboard as they discuss.
               </div>
               <div style={{ display: "flex", gap: 18, marginTop: 4 }}>
                 {([["INTERVIEWER", IV], ["CANDIDATE", CX], ["YOU", HU]] as const).map(([l, c]) => (
                   <div key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: c }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />
-                    {l}
+                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />{l}
                   </div>
                 ))}
               </div>
@@ -451,7 +474,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
           )}
         </div>
 
-        {/* Compact transcript sidebar */}
+        {/* Compact transcript */}
         <aside style={{ width: 256, flexShrink: 0, display: "flex", flexDirection: "column", borderLeft: "1px solid var(--line)", background: "var(--bg-2)" }}>
           <div style={{ flexShrink: 0, padding: "7px 12px 6px", borderBottom: "1px solid var(--line)", display: "flex", gap: 14 }}>
             {(["interviewer", "candidate"] as const).map(r => (
