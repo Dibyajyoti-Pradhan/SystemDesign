@@ -221,6 +221,7 @@ function translateElement(
 
 export interface WhiteboardHandle {
   addElements: (elements: WhiteboardElement[]) => void;
+  removeElementsByPrefix: (prefix: string) => void;
 }
 
 export interface WhiteboardCanvasProps {
@@ -369,6 +370,21 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     addElements(newEls: WhiteboardElement[]) {
       pushUndo();
       elementsRef.current = [...elementsRef.current, ...newEls];
+      requestRedraw();
+      notifyChange();
+    },
+    removeElementsByPrefix(prefix: string) {
+      const before = elementsRef.current;
+      const after = before.filter(el => !el.id.startsWith(prefix));
+      if (after.length === before.length) return; // nothing to remove
+      // Push pre-removal snapshot so undo restores the removed elements.
+      undoStackRef.current.push(before.map(el => {
+        if (el.type === "pen") return { ...el, points: el.points.map(p => ({ ...p })) };
+        return { ...el };
+      }));
+      if (undoStackRef.current.length > UNDO_LIMIT) undoStackRef.current.shift();
+      redoStackRef.current = [];
+      elementsRef.current = after;
       requestRedraw();
       notifyChange();
     },

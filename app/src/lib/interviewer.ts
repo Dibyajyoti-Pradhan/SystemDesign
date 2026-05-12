@@ -187,23 +187,29 @@ export function buildInterviewerSystemPrompt(
 
   const voiceBlock = voiceMode ? `
 
-# VOICE MODE — STRICT BREVITY + WHITEBOARD
-You are speaking aloud in a real-time voice interview. The candidate drives 80%.
-- Every spoken response: **1–2 sentences maximum**. **One question per turn — never stack questions.**
-- No bullet lists. No Mermaid. Just a terse spoken probe.
-- Good: "What's your read/write ratio?" / "How do you handle hot keys?"
-- Bad: three paragraphs, or two questions in one turn.
+# VOICE MODE
+Speak naturally — 2-4 sentences per turn. No bullet lists. No code blocks.
 
-## Whiteboard (optional, use sparingly)
-You MAY draw a requirement note when clarifying scope. Append a draw block AFTER your spoken text:
-\`\`\`
+## Whiteboard (draw ONLY when needed, not every turn)
+Append a <<DRAW>>...<<END_DRAW>> block ONLY when you're actively introducing new content.
+
+Format:
 <<DRAW>>
-{"boxes":[{"id":"UNIQUE_ID","label":"SHORT LABEL","c":COLUMN,"r":ROW,"style":"note"}],"arrows":[]}
+{"panels":[{"id":"requirements","lines":["1. Collaborative text editing","2. Auth required"],"append":true}],"boxes":[],"arrows":[]}
 <<END_DRAW>>
-\`\`\`
-Grid: 6 cols (c: 0–5), 5 rows (r: 0–4). Row 0 = requirements/context. Cols 0–1 = left side.
-Keep labels ≤ 3 words. IDs reusable across turns. Only draw requirement/scope notes — the candidate draws architecture.
-If nothing to draw: omit the block entirely.` : "";
+
+Panel IDs: "requirements" | "scale" | "apis" | "datamodel"
+- Use "append":true to add lines to an existing panel (default)
+- Use "append":false only on the first time you populate a panel
+- Leave "panels":[] if not updating any panel
+
+Architecture boxes (right side of canvas):
+- cols 0-5, rows 0-4 (0=top, 4=bottom). Column 0 overlaps panels — start at col 1.
+- Only draw a box when you're explaining what that component does
+- IDs are reusable across turns — reference existing boxes in new arrows
+- DO NOT draw if you're just mentioning a technology
+
+Skip the draw block entirely if nothing new is being drawn this turn.` : "";
 
   const hintBlock = `
 
@@ -263,31 +269,29 @@ export function buildCandidateSystemPrompt(
 ): string {
   const voiceBlock = voiceMode ? `
 
-# VOICE MODE — RESPOND + DRAW
-You speak aloud AND draw on the shared whiteboard every turn.
+# VOICE MODE
+Speak naturally — 2-4 sentences per turn. No bullet lists. No code blocks.
 
-## Spoken response (3–5 sentences)
-- No Mermaid, no code blocks — speak naturally.
-- Back-of-envelope only: rough numbers, don't show step-by-step math. "~10K QPS, ~1TB/day" is enough.
-- Think out loud. Mention component names clearly.
+## Whiteboard (draw ONLY when needed, not every turn)
+Append a <<DRAW>>...<<END_DRAW>> block ONLY when you're actively introducing new content.
 
-## Whiteboard draw command — REQUIRED every turn
-After your spoken text, output a draw block. Do NOT wrap it in backticks or code fences. Output it as raw text exactly like this:
-
+Format:
 <<DRAW>>
-{"boxes":[{"id":"lb","label":"Load Balancer","c":2,"r":2},{"id":"app","label":"App Server","c":2,"r":3}],"arrows":[{"from":"lb","to":"app"}]}
+{"panels":[{"id":"requirements","lines":["1. Collaborative text editing","2. Auth required"],"append":true}],"boxes":[],"arrows":[]}
 <<END_DRAW>>
 
-Grid: 6 cols (c: 0–5) × 5 rows (r: 0–4):
-- r=0: Requirements/context  r=1: Client/external  r=2: Edge/ingress (CDN, LB, API GW)
-- r=3: Services/app tier  r=4: Data tier (DB, cache, queue, workers)
+Panel IDs: "requirements" | "scale" | "apis" | "datamodel"
+- Use "append":true to add lines to an existing panel (default)
+- Use "append":false only on the first time you populate a panel
+- Leave "panels":[] if not updating any panel
 
-Rules:
-- IDs are reusable across turns — arrows in later turns can reference boxes from earlier turns
-- Labels: max 3 words, title-case
-- Arrows show data flow / request path
-- Only add NEW boxes — never re-emit a box ID you've already drawn
-- Always emit the <<DRAW>> block. If nothing new: {"boxes":[],"arrows":[]}` : "";
+Architecture boxes (right side of canvas):
+- cols 0-5, rows 0-4 (0=top, 4=bottom). Column 0 overlaps panels — start at col 1.
+- Only draw a box when you're explaining what that component does
+- IDs are reusable across turns — reference existing boxes in new arrows
+- DO NOT draw if you're just mentioning a technology
+
+Skip the draw block entirely if nothing new is being drawn this turn.` : "";
 
   return `You are a senior software engineer (~7-10 yrs) interviewing for a staff position. You are the CANDIDATE designing: "${question.title}".
 

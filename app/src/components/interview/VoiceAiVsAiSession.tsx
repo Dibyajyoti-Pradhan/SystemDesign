@@ -27,7 +27,12 @@ interface Props {
 
 interface DrawBox { id: string; label: string; c: number; r: number; style?: "note"; }
 interface DrawArrow { from: string; to: string; }
-interface DrawCmd { boxes?: DrawBox[]; arrows?: DrawArrow[]; }
+interface DrawPanel {
+  id: "requirements" | "scale" | "apis" | "datamodel";
+  lines: string[];
+  append: boolean;
+}
+interface DrawCmd { boxes?: DrawBox[]; arrows?: DrawArrow[]; panels?: DrawPanel[]; }
 
 const DRAW_RE = /<<DRAW>>([\s\S]*?)<<END_DRAW>>/;
 
@@ -47,37 +52,76 @@ function stripMeta(text: string): string {
     .trim();
 }
 
-// Fallback: extract known arch terms when no <<DRAW>> block found
-const FALLBACK_TERMS: [string, string][] = [
-  ["load balancer", "Load Balancer"], ["api gateway", "API Gateway"],
-  ["cdn", "CDN"], ["cache", "Cache"], ["redis", "Redis"],
-  ["database", "Database"], ["postgres", "Postgres"], ["mysql", "MySQL"],
-  ["cassandra", "Cassandra"], ["dynamodb", "DynamoDB"],
-  ["message queue", "Message Queue"], ["kafka", "Kafka"], ["sqs", "SQS"],
-  ["worker", "Workers"], ["app server", "App Server"], ["app tier", "App Tier"],
-  ["object storage", "Object Storage"], ["s3", "S3"],
-  ["rate limit", "Rate Limiter"], ["auth", "Auth Service"],
-  ["search", "Search"], ["elasticsearch", "Elasticsearch"],
-];
+// ---------------------------------------------------------------------------
+// Panel zones (left column, fixed pixel positions)
+// ---------------------------------------------------------------------------
 
-function fallbackCmd(text: string, usedLabels: Set<string>): DrawCmd {
-  const lower = text.toLowerCase();
-  const boxes: DrawBox[] = [];
-  for (const [kw, label] of FALLBACK_TERMS) {
-    if (lower.includes(kw) && !usedLabels.has(label) && boxes.length < 3) {
-      boxes.push({ id: label.toLowerCase().replace(/\s+/g, "_"), label, c: 0, r: 0 });
-    }
+const PANEL_ZONES: Record<string, { x: number; y: number; w: number; h: number; title: string; color: string }> = {
+  requirements: { x: 20,  y: 20,  w: 260, h: 220, title: "Requirements",  color: "#69db7c" },
+  scale:        { x: 20,  y: 260, w: 260, h: 180, title: "Scale / BOE",   color: "#74c0fc" },
+  apis:         { x: 20,  y: 460, w: 260, h: 160, title: "APIs",          color: "#ffd43b" },
+  datamodel:    { x: 20,  y: 640, w: 260, h: 160, title: "Data Model",    color: "#da77f2" },
+};
+
+const PANEL_TITLE_FONT = 11;
+const PANEL_LINE_FONT  = 12;
+const PANEL_LINE_H     = 18;
+const PANEL_CONTENT_Y  = 38; // y offset inside panel for first line
+
+function buildPanelElements(panel: DrawPanel, existingLineCount: number): WhiteboardElement[] {
+  const zone = PANEL_ZONES[panel.id];
+  if (!zone) return [];
+  const els: WhiteboardElement[] = [];
+
+  // Only emit bg rect and title if this is a fresh panel (not appending to existing)
+  if (!panel.append || existingLineCount === 0) {
+    els.push({
+      id: `panel:${panel.id}:bg`,
+      type: "rect",
+      x: zone.x, y: zone.y,
+      width: zone.w, height: zone.h,
+      color: zone.color,
+      fill: `${zone.color}18`,
+      strokeWidth: 1.2,
+    } as WhiteboardElement);
+    els.push({
+      id: `panel:${panel.id}:title`,
+      type: "text",
+      x: zone.x + 8, y: zone.y + 16,
+      color: zone.color,
+      strokeWidth: 1,
+      text: zone.title.toUpperCase(),
+      fontSize: PANEL_TITLE_FONT,
+    } as WhiteboardElement);
   }
-  return { boxes, arrows: [] };
+
+  // Add line text elements starting from existingLineCount index
+  panel.lines.forEach((line, i) => {
+    const lineIdx = existingLineCount + i;
+    const yPos = zone.y + PANEL_CONTENT_Y + lineIdx * PANEL_LINE_H;
+    // Don't draw past the panel bottom
+    if (yPos + PANEL_LINE_FONT > zone.y + zone.h) return;
+    els.push({
+      id: `panel:${panel.id}:line:${lineIdx}`,
+      type: "text",
+      x: zone.x + 8, y: yPos,
+      color: "#e0e0e0",
+      strokeWidth: 1,
+      text: line,
+      fontSize: PANEL_LINE_FONT,
+    } as WhiteboardElement);
+  });
+
+  return els;
 }
 
 // ---------------------------------------------------------------------------
-// Grid → pixel layout
+// Grid → pixel layout (shifted right to avoid panel column)
 // ---------------------------------------------------------------------------
 
 const CELL_W = 190;
 const CELL_H = 90;
-const GRID_X = 48;
+const GRID_X = 310;  // shifted right to avoid left panel column
 const GRID_Y = 56;
 const BOX_W = 154;
 const BOX_H = 52;
@@ -88,25 +132,6 @@ function gridBox(c: number, r: number): NodeRect {
   const x = GRID_X + c * CELL_W;
   const y = GRID_Y + r * CELL_H;
   return { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2, w: BOX_W, h: BOX_H };
-}
-
-// Auto-assign grid position for fallback terms
-function assignFallbackPositions(boxes: DrawBox[], nodeMap: Map<string, NodeRect>): DrawBox[] {
-  const takenSlots = new Set<string>();
-  for (const [, rect] of nodeMap) {
-    // find closest grid slot to existing rect
-    const c = Math.round((rect.x - GRID_X) / CELL_W);
-    const r = Math.round((rect.y - GRID_Y) / CELL_H);
-    takenSlots.add(`${c},${r}`);
-  }
-  let slot = 0;
-  return boxes.map(box => {
-    while (takenSlots.has(`${slot % 6},${Math.floor(slot / 6)}`)) slot++;
-    const c = slot % 6;
-    const r = Math.min(4, Math.floor(slot / 6));
-    slot++;
-    return { ...box, c, r };
-  });
 }
 
 function arrowEndpoints(src: NodeRect, dst: NodeRect): [number, number, number, number] {
@@ -124,11 +149,32 @@ function buildElements(
   role: "interviewer" | "candidate",
   nodeMap: Map<string, NodeRect>,
   usedLabels: Set<string>,
+  panelLineCountRef: React.MutableRefObject<Map<string, number>>,
+  whiteboardRef: React.RefObject<WhiteboardHandle | null>,
 ): { elements: WhiteboardElement[]; firstNewPos: { x: number; y: number } | null } {
   const color = role === "interviewer" ? "#D4A574" : "#7DA7C9";
   const els: WhiteboardElement[] = [];
   let firstNewPos: { x: number; y: number } | null = null;
 
+  // Process panels
+  for (const panel of (cmd.panels ?? [])) {
+    const existingCount = panelLineCountRef.current.get(panel.id) ?? 0;
+    if (!panel.append) {
+      // Replace — remove existing elements for this panel, reset count
+      whiteboardRef.current?.removeElementsByPrefix(`panel:${panel.id}:`);
+      panelLineCountRef.current.set(panel.id, 0);
+      const panelEls = buildPanelElements({ ...panel, append: false }, 0);
+      els.push(...panelEls);
+      panelLineCountRef.current.set(panel.id, panel.lines.length);
+    } else {
+      // Append
+      const panelEls = buildPanelElements(panel, existingCount);
+      els.push(...panelEls);
+      panelLineCountRef.current.set(panel.id, existingCount + panel.lines.length);
+    }
+  }
+
+  // Process boxes
   for (const box of (cmd.boxes ?? [])) {
     if (nodeMap.has(box.id)) continue;
     const rect = gridBox(Math.max(0, Math.min(5, box.c)), Math.max(0, Math.min(4, box.r)));
@@ -155,6 +201,7 @@ function buildElements(
     } as WhiteboardElement);
   }
 
+  // Process arrows
   for (const arrow of (cmd.arrows ?? [])) {
     const src = nodeMap.get(arrow.from);
     const dst = nodeMap.get(arrow.to);
@@ -175,9 +222,13 @@ function buildElements(
 // TTS
 // ---------------------------------------------------------------------------
 
-function speakTurn(text: string, role: "interviewer" | "candidate", onEnd: () => void) {
-  if (typeof window === "undefined" || !window.speechSynthesis) { onEnd(); return; }
-  window.speechSynthesis.cancel();
+function speakTurn(
+  text: string,
+  role: "interviewer" | "candidate",
+  onPreSpeak: () => void,
+  onEnd: () => void,
+) {
+  if (typeof window === "undefined" || !window.speechSynthesis) { onPreSpeak(); onEnd(); return; }
   const u = new SpeechSynthesisUtterance(text);
   u.rate = role === "interviewer" ? 0.93 : 0.97;
   u.pitch = role === "interviewer" ? 1.0 : 0.93;
@@ -195,6 +246,8 @@ function speakTurn(text: string, role: "interviewer" | "candidate", onEnd: () =>
   }
   u.onend = onEnd;
   u.onerror = onEnd;
+  // Call pre-speak callback (adds to transcript) immediately before starting
+  onPreSpeak();
   window.speechSynthesis.speak(u);
 }
 
@@ -247,6 +300,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeMapRef = useRef<Map<string, NodeRect>>(new Map());
   const usedLabelsRef = useRef<Set<string>>(new Set());
+  const panelLineCountRef = useRef<Map<string, number>>(new Map());
 
   const [transcript, setTranscript] = useState<Msg[]>(initialTranscript);
   const [started, setStarted] = useState(false);
@@ -266,7 +320,11 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   const isSteppingRef = useRef(false);
   const lastDrawTargetRef = useRef<{ x: number; y: number } | undefined>(undefined);
   const titleDrawnRef = useRef(false);
-  const pendingCxRef = useRef<{ text: string; elements: WhiteboardElement[] } | null>(null);
+  const pendingCxRef = useRef<{
+    text: string;
+    elements: WhiteboardElement[];
+    addTranscript: () => void;
+  } | null>(null);
 
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
   useEffect(() => { endedRef.current = ended; }, [ended]);
@@ -292,25 +350,19 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     } as WhiteboardElement]);
   }
 
-  // Build the element list and update nodeMap/usedLabels immediately (so the
-  // cursor animation can target the first new node), but don't push the
-  // elements onto the whiteboard yet — that happens progressively during
-  // speech via applyDrawingProgressive.
+  // Build element list from a raw response string. Does NOT call setTranscript.
   function collectDrawElements(raw: string, role: "interviewer" | "candidate"): WhiteboardElement[] {
     if (whiteboardRef.current) drawTitleOnce();
 
-    let cmd = parseDrawCmd(raw);
-    if (!cmd || (!(cmd.boxes?.length) && !(cmd.arrows?.length))) {
-      const spoken = stripMeta(raw);
-      const fb = fallbackCmd(spoken, usedLabelsRef.current);
-      if (fb.boxes && fb.boxes.length > 0) {
-        const positioned = assignFallbackPositions(fb.boxes, nodeMapRef.current);
-        cmd = { boxes: positioned, arrows: [] };
-      }
-    }
+    const cmd = parseDrawCmd(raw);
     if (!cmd) return [];
+    const hasContent =
+      (cmd.boxes?.length ?? 0) > 0 ||
+      (cmd.arrows?.length ?? 0) > 0 ||
+      (cmd.panels?.length ?? 0) > 0;
+    if (!hasContent) return [];
 
-    const { elements, firstNewPos } = buildElements(cmd, role, nodeMapRef.current, usedLabelsRef.current);
+    const { elements, firstNewPos } = buildElements(cmd, role, nodeMapRef.current, usedLabelsRef.current, panelLineCountRef, whiteboardRef);
     if (firstNewPos) lastDrawTargetRef.current = firstNewPos;
     return elements;
   }
@@ -358,9 +410,9 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         const isEnd = ivText.includes("<<INTERVIEW_END>>");
         const spoken = stripMeta(ivText.replace(/<<INTERVIEW_END>>/g, ""));
         const drawElements = collectDrawElements(ivText, "interviewer");
-        setTranscript(prev => [...prev, { role: "interviewer", content: spoken, ts: Date.now() }]);
 
         if (isEnd) {
+          setTranscript(prev => [...prev, { role: "interviewer", content: spoken, ts: Date.now() }]);
           setEnded(true); endedRef.current = true;
           setIsPlaying(false); setSpeaker(null);
           whiteboardRef.current?.addElements(drawElements);
@@ -371,29 +423,37 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         setIsLoading(false);
 
         if (!isPlayingRef.current) {
+          // Not playing — add to transcript immediately and apply drawing
+          setTranscript(prev => [...prev, { role: "interviewer", content: spoken, ts: Date.now() }]);
           whiteboardRef.current?.addElements(drawElements);
           return;
         }
 
         setSpeaker("interviewer");
         applyDrawingProgressive(drawElements, spoken);
-        speakTurn(spoken, "interviewer", () => {
-          setSpeaker(null);
-          const pending = pendingCxRef.current;
-          pendingCxRef.current = null;
-          if (pending && isPlayingRef.current && !endedRef.current) {
-            setSpeaker("candidate");
-            applyDrawingProgressive(pending.elements, pending.text);
-            speakTurn(pending.text, "candidate", () => {
-              setSpeaker(null);
-              if (isPlayingRef.current && !endedRef.current) {
-                setTimeout(() => { void exchangeAndSpeak(); }, 600);
-              }
-            });
-          } else if (isPlayingRef.current && !endedRef.current) {
-            setTimeout(() => { void exchangeAndSpeak(); }, 600);
-          }
-        });
+        speakTurn(spoken, "interviewer",
+          () => { setTranscript(prev => [...prev, { role: "interviewer", content: spoken, ts: Date.now() }]); },
+          () => {
+            setSpeaker(null);
+            const pending = pendingCxRef.current;
+            pendingCxRef.current = null;
+            if (pending && isPlayingRef.current && !endedRef.current) {
+              setSpeaker("candidate");
+              applyDrawingProgressive(pending.elements, pending.text);
+              speakTurn(pending.text, "candidate",
+                () => { pending.addTranscript(); },
+                () => {
+                  setSpeaker(null);
+                  if (isPlayingRef.current && !endedRef.current) {
+                    setTimeout(() => { void exchangeAndSpeak(); }, 600);
+                  }
+                },
+              );
+            } else if (isPlayingRef.current && !endedRef.current) {
+              setTimeout(() => { void exchangeAndSpeak(); }, 600);
+            }
+          },
+        );
       };
 
       for (;;) {
@@ -434,8 +494,22 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       if (cxText.trim()) {
         const spokenCx = stripMeta(cxText);
         const elements = collectDrawElements(cxText, "candidate");
-        setTranscript(prev => [...prev, { role: "candidate", content: spokenCx, ts: Date.now() }]);
-        pendingCxRef.current = { text: spokenCx, elements };
+        const ts = Date.now();
+        if (!isPlayingRef.current) {
+          // Not playing — add transcript immediately and apply drawing
+          setTranscript(prev => [...prev, { role: "candidate", content: spokenCx, ts }]);
+          whiteboardRef.current?.addElements(elements);
+        } else {
+          // Playing — store text, elements, and a transcript callback.
+          // The IV onEnd block will call addTranscript() right as CX speech begins.
+          pendingCxRef.current = {
+            text: spokenCx,
+            elements,
+            addTranscript: () => {
+              setTranscript(prev => [...prev, { role: "candidate", content: spokenCx, ts }]);
+            },
+          };
+        }
       }
 
       if (!ivSpeakStarted) {
@@ -448,7 +522,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       setIsPlaying(false); setSpeaker(null);
       isSteppingRef.current = false; setIsLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function beginAndPlay() {
     setStarted(true); setIsPlaying(true); isPlayingRef.current = true;
