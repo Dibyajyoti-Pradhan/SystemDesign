@@ -62,7 +62,7 @@ export function VoiceInterviewSession({
     hintLevelRef.current = hintLevel;
   }, [hintLevel]);
 
-  const { speak, stop: stopSpeaking, isSpeaking } = useVoicePlayback();
+  const { speak, speakWhenReady, stop: stopSpeaking, isSpeaking } = useVoicePlayback();
   const isSpeakingRef = useRef(false);
   useEffect(() => {
     isSpeakingRef.current = isSpeaking;
@@ -187,8 +187,8 @@ export function VoiceInterviewSession({
     }
   }, [isListening]);
 
-  // Set transcript on mount but do NOT speak yet — browsers block
-  // speechSynthesis without a user gesture. Speaking happens on first mic click.
+  // Speak the opening message as soon as voices are loaded (speakWhenReady
+  // queues it if voices aren't available yet — no click required).
   useEffect(() => {
     if (hasMountedRef.current) return;
     hasMountedRef.current = true;
@@ -196,8 +196,9 @@ export function VoiceInterviewSession({
       setTranscript([
         { role: "interviewer", content: firstInterviewerMessage, timestamp: new Date() },
       ]);
+      speakWhenReady(firstInterviewerMessage);
     }
-  }, [firstInterviewerMessage]);
+  }, [firstInterviewerMessage, speakWhenReady]);
 
   async function endSession() {
     if (!confirm("End this voice interview and get a score?")) return;
@@ -237,20 +238,13 @@ export function VoiceInterviewSession({
     if (isListening) {
       stopListening();
     } else {
-      // First mic click: speak the opening question (user gesture required by browser).
-      if (!openingSpokenRef.current && firstInterviewerMessage) {
-        openingSpokenRef.current = true;
-        speak(firstInterviewerMessage);
-        return;
-      }
       stopSpeaking();
       startListening();
     }
   }
 
-  const openingHeard = openingSpokenRef.current;
   const statusText: Record<Status, string> = {
-    idle: openingHeard ? "Press mic to speak" : "Press mic to hear the question",
+    idle: "Press mic to speak",
     listening: "Listening…",
     thinking: "Interviewer thinking…",
     speaking: "Interviewer speaking…",
