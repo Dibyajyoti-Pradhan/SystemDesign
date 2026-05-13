@@ -11,8 +11,8 @@ import {
   type PacingContext,
 } from "@/lib/interviewer";
 
-const SOFT_BUDGET_TURNS = 20;
-const HARD_CAP_TURNS = 24;
+const SOFT_BUDGET_TURNS = 14;
+const HARD_CAP_TURNS = 16;
 import { extractPdfText } from "@/lib/extractPdf";
 import { REPO_ROOT } from "@/lib/paths";
 
@@ -216,7 +216,8 @@ The interview is wrapping up. Keep this turn tight — summarize tradeoffs you'd
       let assistantText = "";
       let closed = false;
       const safeEnqueue = (chunk: Uint8Array) => {
-        if (!closed) controller.enqueue(chunk);
+        if (closed) return;
+        try { controller.enqueue(chunk); } catch { closed = true; }
       };
       const safeClose = () => {
         if (!closed) {

@@ -58,10 +58,31 @@ export async function POST(req: NextRequest) {
     ts: Date.now(),
   });
 
-  await db
-    .update(interviewSessions)
-    .set({ transcript: JSON.stringify(transcript) })
-    .where(eq(interviewSessions.id, sessionId));
+  // Retry on transient SQLITE_BUSY / SQLITE_IOERR — same pattern as score/exchange.
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      await db
+        .update(interviewSessions)
+        .set({ transcript: JSON.stringify(transcript) })
+        .where(eq(interviewSessions.id, sessionId));
+      lastErr = null;
+      break;
+    } catch (e) {
+      lastErr = e;
+      const code = (e as { code?: string })?.code ?? "";
+      const transient = code === "SQLITE_BUSY" || code === "SQLITE_LOCKED" || code.startsWith("SQLITE_IOERR");
+      if (!transient || attempt === 4) break;
+      await new Promise((r) => setTimeout(r, 250 * attempt));
+    }
+  }
+  if (lastErr) {
+    console.error("[steer] persist failed after retries", lastErr);
+    return NextResponse.json(
+      { error: "Could not persist steer — transient disk pressure. Try again." },
+      { status: 503 },
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }

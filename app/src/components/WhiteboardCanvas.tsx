@@ -27,7 +27,11 @@ import {
 // Data model
 // ---------------------------------------------------------------------------
 
-export type ElementType = "pen" | "rect" | "arrow" | "text";
+export type ElementType = "pen" | "rect" | "arrow" | "text" | "circle";
+
+/** Semantic categories for arrows. Picks a color so the observer can tell
+ *  flows apart in a busy diagram. */
+export type ArrowFlow = "read" | "write" | "async" | "error" | "control";
 
 export interface BaseElement {
   id: string;
@@ -48,25 +52,47 @@ export interface RectElement extends BaseElement {
   width: number;
   height: number;
   fill: string;
+  /** When > 1, render N-1 offset ghost copies behind this rect to convey
+   *  "replicated component" (e.g., Worker × 5). Capped at 3 visually. */
+  replicas?: number;
+}
+
+export interface CircleElement extends BaseElement {
+  type: "circle";
+  /** Radius in world units. */
+  radius: number;
+  fill: string;
+  replicas?: number;
 }
 
 export interface ArrowElement extends BaseElement {
   type: "arrow";
   endX: number;
   endY: number;
+  /** Optional text rendered near the arrow midpoint (e.g., "POST /upload"). */
+  label?: string;
+  /** Semantic flow type — picks the arrow color and the label tint. */
+  flow?: ArrowFlow;
 }
 
 export interface TextElement extends BaseElement {
   type: "text";
   text: string;
   fontSize: number;
+  /** When set, the text auto-wraps to this width (in world px) using
+   *  character-width approximation. Used for box labels. */
+  wrapWidth?: number;
+  /** When true and the text contains \n, render each line on its own row.
+   *  Default true. */
+  multiline?: boolean;
 }
 
 export type WhiteboardElement =
   | PenElement
   | RectElement
   | ArrowElement
-  | TextElement;
+  | TextElement
+  | CircleElement;
 
 export type Tool = "select" | "pen" | "rect" | "arrow" | "text" | "eraser" | "hand";
 
@@ -97,6 +123,9 @@ export function getCanvasJSON(elements: readonly WhiteboardElement[]): string {
     if (el.type === "rect") {
       base.w = Math.round(el.width);
       base.h = Math.round(el.height);
+    } else if (el.type === "circle") {
+      // Reuse w as diameter for the export shape.
+      base.w = Math.round(el.radius * 2);
     } else if (el.type === "arrow") {
       base.endX = Math.round(el.endX);
       base.endY = Math.round(el.endY);
@@ -153,6 +182,14 @@ function elementBounds(el: WhiteboardElement): Bounds {
       minY: Math.min(el.y, el.endY),
       maxX: Math.max(el.x, el.endX),
       maxY: Math.max(el.y, el.endY),
+    };
+  }
+  if (el.type === "circle") {
+    return {
+      minX: el.x - el.radius,
+      minY: el.y - el.radius,
+      maxX: el.x + el.radius,
+      maxY: el.y + el.radius,
     };
   }
   if (el.type === "text") {
@@ -222,21 +259,37 @@ function translateElement(
 export interface WhiteboardHandle {
   addElements: (elements: WhiteboardElement[]) => void;
   removeElementsByPrefix: (prefix: string) => void;
+  /** Smoothly pan & zoom so every non-panel element fits in the viewport. */
+  fitToContent: () => void;
+  /** Add elements WITHOUT the draw-in animation. Used on page reload to
+   *  rebuild the whiteboard from the persisted transcript instantly. */
+  restoreElements: (elements: WhiteboardElement[]) => void;
 }
 
 export interface WhiteboardCanvasProps {
   onChange?: (elements: WhiteboardElement[]) => void;
   readOnly?: boolean;
+  /** Skip rendering of all "panel:*" elements (Requirements/Scale/APIs/etc.) —
+   * lets the AI-vs-AI observer focus on the architecture diagram alone. */
+  hidePanels?: boolean;
+  /** Reserve this many screen-px on the left of the viewport for an external
+   * overlay (e.g., the AI-vs-AI Requirements/Scale/APIs panel column). The
+   * fit-to-content logic skips this band when auto-zooming so the architecture
+   * never lands underneath the overlay. */
+  reservedLeft?: number;
 }
 
 interface TextEditState {
   worldX: number;
   worldY: number;
   value: string;
+  /** If set, the commit replaces the text of this existing element instead of
+   *  creating a new one (used by double-click-to-edit on box labels). */
+  editingId?: string;
 }
 
 export const WhiteboardCanvas = forwardRef<WhiteboardHandle, WhiteboardCanvasProps>(
-function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps, ref) {
+function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, reservedLeft = 0 }: WhiteboardCanvasProps, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -258,6 +311,9 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     lastScreenX: number;
     lastScreenY: number;
     selectedId: string | null;
+    /** When dragging a `box-<X>` rect/circle, these are the ids of paired
+     *  `lbl-<X>...` text elements that should move with the box. */
+    partnerIds: string[];
     movedDuringDrag: boolean;
   }>({
     mode: "none",
@@ -266,6 +322,7 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     lastScreenX: 0,
     lastScreenY: 0,
     selectedId: null,
+    partnerIds: [],
     movedDuringDrag: false,
   });
 
@@ -311,6 +368,23 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
 
   // Canvas pixel size tracking (for HiDPI).
   const sizeRef = useRef({ width: 0, height: 0, dpr: 1 });
+
+  // Mirror the hidePanels prop into a ref so the draw loop (called from rAF)
+  // sees the latest value without needing to re-bind drawElement.
+  const hidePanelsRef = useRef(hidePanels);
+  useEffect(() => {
+    hidePanelsRef.current = hidePanels;
+    setRenderTick((t) => (t + 1) & 0x3fffffff);
+  }, [hidePanels]);
+
+  // Mirror reservedLeft into a ref so fitToContent (called from setTimeout,
+  // rAF, the imperative handle, etc.) always reads the latest value. Trigger
+  // a re-fit on change so toggling the side panel column smoothly expands or
+  // contracts the architecture diagram.
+  const reservedLeftRef = useRef(reservedLeft);
+  useEffect(() => {
+    reservedLeftRef.current = reservedLeft;
+  }, [reservedLeft]);
 
   // ---------------------------------------------------------------------
   // Notify parent on changes
@@ -365,13 +439,225 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     notifyChange();
   }, [notifyChange, pushUndo, requestRedraw]);
 
+  // ---------------------------------------------------------------------
+  // Draw-in animations — boxes scale + fade in, arrows stroke-draw, text fades.
+  // Each animation has a target START_TIME (may be in the future if staggered)
+  // and a DURATION. Frames keep requesting redraws while the map is non-empty.
+  // ---------------------------------------------------------------------
+  const animStartRef = useRef<Map<string, number>>(new Map());
+  const BOX_ANIM_MS = 280;
+  const ARROW_ANIM_MS = 460;
+  const TEXT_ANIM_MS = 220;
+
+  const getAnimProgress = useCallback((elId: string, durationMs: number): number => {
+    // Returns:
+    //   -1 → never animated (no entry) → draw at full state
+    //    0 → animation queued but not yet started (stagger) → don't render yet
+    //  0..1 → in progress, apply easing
+    //    1 → completed (entry removed) → draw at full state
+    const start = animStartRef.current.get(elId);
+    if (start === undefined) return -1;
+    const now = performance.now();
+    if (now < start) return 0;
+    const elapsed = now - start;
+    if (elapsed >= durationMs) {
+      animStartRef.current.delete(elId);
+      return 1;
+    }
+    return elapsed / durationMs;
+  }, []);
+
+  const pumpAnimationsRef = useRef<number | null>(null);
+  const pumpAnimations = useCallback(() => {
+    if (animStartRef.current.size === 0) {
+      pumpAnimationsRef.current = null;
+      return;
+    }
+    requestRedraw();
+    pumpAnimationsRef.current = requestAnimationFrame(pumpAnimations);
+  }, [requestRedraw]);
+
+  const startPumpIfIdle = useCallback(() => {
+    if (pumpAnimationsRef.current === null) {
+      pumpAnimationsRef.current = requestAnimationFrame(pumpAnimations);
+    }
+  }, [pumpAnimations]);
+
+  useEffect(() => {
+    return () => {
+      if (pumpAnimationsRef.current !== null) {
+        cancelAnimationFrame(pumpAnimationsRef.current);
+        pumpAnimationsRef.current = null;
+      }
+    };
+  }, []);
+
+  // ---------------------------------------------------------------------
+  // Auto-fit — re-centers and zooms so all non-panel content stays visible.
+  // The AI places architecture boxes on a grid that can extend beyond the
+  // viewport at c=4 or c=5. When that happens we animate the pan/zoom so a
+  // real-time observer always sees the whole diagram, the way a candidate
+  // would step back from the whiteboard.
+  // ---------------------------------------------------------------------
+  const computeContentBbox = useCallback(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let any = false;
+    for (const el of elementsRef.current) {
+      // Skip the left-column panels — they're always anchored to the viewport
+      // and shouldn't drive zoom.
+      if (el.id.startsWith("panel:")) continue;
+      any = true;
+      if (el.type === "rect") {
+        if (el.x < minX) minX = el.x;
+        if (el.y < minY) minY = el.y;
+        if (el.x + el.width > maxX) maxX = el.x + el.width;
+        if (el.y + el.height > maxY) maxY = el.y + el.height;
+      } else if (el.type === "arrow") {
+        const x1 = Math.min(el.x, el.endX), x2 = Math.max(el.x, el.endX);
+        const y1 = Math.min(el.y, el.endY), y2 = Math.max(el.y, el.endY);
+        if (x1 < minX) minX = x1;
+        if (y1 < minY) minY = y1;
+        if (x2 > maxX) maxX = x2;
+        if (y2 > maxY) maxY = y2;
+      } else if (el.type === "text") {
+        // Approximate text bbox — fontSize × ~0.6/char width.
+        const w = el.text.length * el.fontSize * 0.6;
+        if (el.x < minX) minX = el.x;
+        if (el.y - el.fontSize < minY) minY = el.y - el.fontSize;
+        if (el.x + w > maxX) maxX = el.x + w;
+        if (el.y > maxY) maxY = el.y;
+      } else if (el.type === "pen") {
+        for (const p of el.points) {
+          if (p.x < minX) minX = p.x;
+          if (p.y < minY) minY = p.y;
+          if (p.x > maxX) maxX = p.x;
+          if (p.y > maxY) maxY = p.y;
+        }
+      }
+    }
+    if (!any) return null;
+    return { minX, minY, maxX, maxY };
+  }, []);
+
+  // Animation token — every new pan/zoom animation increments this; in-flight
+  // animations bail when they see a newer token. Prevents stale animations
+  // from overwriting fresh ones (e.g., when many addElements fire in a row).
+  const panZoomTokenRef = useRef(0);
+  // Debounce token for the out-of-view re-fit triggered by addElements.
+  const outOfViewTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (outOfViewTimerRef.current !== null) {
+      clearTimeout(outOfViewTimerRef.current);
+      outOfViewTimerRef.current = null;
+    }
+  }, []);
+  const animatePanZoom = useCallback(
+    (targetPanX: number, targetPanY: number, targetZoom: number, durationMs = 480) => {
+      const startPanX = panRef.current.x;
+      const startPanY = panRef.current.y;
+      const startZoom = zoomRef.current;
+      // Skip the animation if we're already close enough.
+      if (
+        Math.abs(targetPanX - startPanX) < 1 &&
+        Math.abs(targetPanY - startPanY) < 1 &&
+        Math.abs(targetZoom - startZoom) < 0.01
+      ) {
+        return;
+      }
+      const myToken = ++panZoomTokenRef.current;
+      const startTime = performance.now();
+      const tick = (now: number) => {
+        if (panZoomTokenRef.current !== myToken) return; // superseded
+        const t = Math.min(1, (now - startTime) / durationMs);
+        // ease-out cubic — feels like a hand stepping back from the board
+        const ease = 1 - Math.pow(1 - t, 3);
+        panRef.current.x = startPanX + (targetPanX - startPanX) * ease;
+        panRef.current.y = startPanY + (targetPanY - startPanY) * ease;
+        zoomRef.current = startZoom + (targetZoom - startZoom) * ease;
+        requestRedraw();
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+    [requestRedraw],
+  );
+
+  const FIT_PADDING = 40;
+  const fitToContent = useCallback(() => {
+    const bbox = computeContentBbox();
+    if (!bbox) return;
+    const { width, height } = sizeRef.current;
+    if (width <= 0 || height <= 0) return;
+    const contentW = bbox.maxX - bbox.minX;
+    const contentH = bbox.maxY - bbox.minY;
+    if (contentW <= 0 || contentH <= 0) return;
+    const reserved = reservedLeftRef.current;
+    const availW = Math.max(80, width - reserved - FIT_PADDING);
+    const availH = Math.max(80, height - FIT_PADDING * 2);
+    const zoomX = availW / contentW;
+    const zoomY = availH / contentH;
+    // Cap at 1 so we never up-zoom past native size; floor at 0.55 so panel
+    // text (rendered as world content) stays legible.
+    const targetZoom = Math.max(0.55, Math.min(1, zoomX, zoomY));
+    const targetPanX = reserved + (availW - contentW * targetZoom) / 2 - bbox.minX * targetZoom;
+    const targetPanY = (height - contentH * targetZoom) / 2 - bbox.minY * targetZoom;
+    animatePanZoom(targetPanX, targetPanY, targetZoom);
+  }, [animatePanZoom, computeContentBbox]);
+
   // Imperative API — lets parent inject AI-drawn elements programmatically.
   useImperativeHandle(ref, () => ({
     addElements(newEls: WhiteboardElement[]) {
       pushUndo();
       elementsRef.current = [...elementsRef.current, ...newEls];
+      // Schedule draw-in animations. Stagger non-panel elements so a row of
+      // boxes appears one at a time, the way a candidate would place them
+      // while talking. Panel decoration (bg/title) skips the animation; panel
+      // text lines get a short fade so the eye catches them.
+      const now = performance.now();
+      let stagger = 0;
+      for (const el of newEls) {
+        if (el.id.startsWith("panel:") && (el.id.endsWith(":bg") || el.id.endsWith(":title"))) {
+          // skip — panel chrome appears instantly
+          continue;
+        }
+        const isPanelLine = el.id.startsWith("panel:") && el.id.includes(":line:");
+        const elStagger = isPanelLine ? 40 : 90;
+        animStartRef.current.set(el.id, now + stagger);
+        stagger += elStagger;
+      }
+      startPumpIfIdle();
       requestRedraw();
       notifyChange();
+      // After paint, debounce a single out-of-view re-fit. Without the
+      // debounce, multiple addElements calls within a few hundred ms each
+      // schedule their own fit-check, and the resulting concurrent pan/zoom
+      // animations step on each other — boxes added early can drift off
+      // screen by the time the last fit settles.
+      const justAddedAnyBox = newEls.some((e) => !e.id.startsWith("panel:"));
+      if (justAddedAnyBox) {
+        if (outOfViewTimerRef.current !== null) clearTimeout(outOfViewTimerRef.current);
+        outOfViewTimerRef.current = window.setTimeout(() => {
+          outOfViewTimerRef.current = null;
+          const bbox = computeContentBbox();
+          if (!bbox) return;
+          const { width, height } = sizeRef.current;
+          const z = zoomRef.current;
+          const px = panRef.current.x;
+          const py = panRef.current.y;
+          const onScreenLeft = bbox.minX * z + px;
+          const onScreenRight = bbox.maxX * z + px;
+          const onScreenTop = bbox.minY * z + py;
+          const onScreenBottom = bbox.maxY * z + py;
+          const fudge = 8;
+          const reserved = reservedLeftRef.current;
+          const outOfView =
+            onScreenRight > width - fudge ||
+            onScreenBottom > height - fudge ||
+            onScreenLeft < reserved + fudge ||
+            onScreenTop < 0 + fudge;
+          if (outOfView) fitToContent();
+        }, 400);
+      }
     },
     removeElementsByPrefix(prefix: string) {
       const before = elementsRef.current;
@@ -388,7 +674,16 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
       requestRedraw();
       notifyChange();
     },
-  }), [pushUndo, requestRedraw, notifyChange]);
+    fitToContent,
+    restoreElements(newEls: WhiteboardElement[]) {
+      elementsRef.current = [...elementsRef.current, ...newEls];
+      requestRedraw();
+      notifyChange();
+      // After paint, fit the camera once so a reloaded interview shows the
+      // full state, even if boxes ran off the original viewport.
+      setTimeout(() => fitToContent(), 50);
+    },
+  }), [pushUndo, requestRedraw, notifyChange, computeContentBbox, fitToContent]);
 
   // ---------------------------------------------------------------------
   // Drawing
@@ -425,6 +720,21 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
       ctx.strokeStyle = el.color;
       ctx.lineWidth = el.strokeWidth;
 
+      // ---- Draw-in animation: figure out the per-element progress -------
+      // Pick a duration per element type. Rect/arrow get longer; text fades.
+      const animDuration =
+        el.type === "arrow" ? ARROW_ANIM_MS :
+        el.type === "rect"  ? BOX_ANIM_MS :
+        el.type === "text"  ? TEXT_ANIM_MS :
+        BOX_ANIM_MS;
+      const rawT = getAnimProgress(el.id, animDuration);
+      const isAnimating = rawT >= 0 && rawT < 1;
+      // Skip rendering entirely if the animation hasn't fired yet (staggered start).
+      if (rawT === 0) return;
+      // Ease-out cubic
+      const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+      const animT = isAnimating ? ease(rawT) : 1;
+
       if (el.type === "pen") {
         if (el.points.length === 0) return;
         ctx.beginPath();
@@ -434,22 +744,148 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
         }
         ctx.stroke();
       } else if (el.type === "rect") {
+        ctx.save();
+        if (isAnimating) {
+          const cx = el.x + el.width / 2;
+          const cy = el.y + el.height / 2;
+          const s = 0.86 + 0.14 * animT;
+          ctx.globalAlpha = animT;
+          ctx.translate(cx, cy);
+          ctx.scale(s, s);
+          ctx.translate(-cx, -cy);
+        }
+        // Replica ghost-stack: up to 2 offset duplicates behind the main rect.
+        const stackCount = Math.max(0, Math.min(2, (el.replicas ?? 1) - 1));
+        for (let i = stackCount; i >= 1; i--) {
+          const ox = i * 6;
+          const oy = -i * 6;
+          ctx.save();
+          ctx.globalAlpha = (ctx.globalAlpha ?? 1) * (0.45 - i * 0.12);
+          if (el.fill && el.fill !== "transparent") {
+            ctx.fillStyle = el.fill;
+            ctx.fillRect(el.x + ox, el.y + oy, el.width, el.height);
+          }
+          ctx.strokeRect(el.x + ox, el.y + oy, el.width, el.height);
+          ctx.restore();
+        }
         if (el.fill && el.fill !== "transparent") {
           ctx.fillStyle = el.fill;
           ctx.fillRect(el.x, el.y, el.width, el.height);
         }
         ctx.strokeRect(el.x, el.y, el.width, el.height);
+        ctx.restore();
+      } else if (el.type === "circle") {
+        ctx.save();
+        if (isAnimating) {
+          const s = 0.86 + 0.14 * animT;
+          ctx.globalAlpha = animT;
+          ctx.translate(el.x, el.y);
+          ctx.scale(s, s);
+          ctx.translate(-el.x, -el.y);
+        }
+        // Replica ghost-stack for circles
+        const stackCount = Math.max(0, Math.min(2, (el.replicas ?? 1) - 1));
+        for (let i = stackCount; i >= 1; i--) {
+          const ox = i * 6;
+          const oy = -i * 6;
+          ctx.save();
+          ctx.globalAlpha = (ctx.globalAlpha ?? 1) * (0.45 - i * 0.12);
+          ctx.beginPath();
+          ctx.arc(el.x + ox, el.y + oy, el.radius, 0, Math.PI * 2);
+          if (el.fill && el.fill !== "transparent") {
+            ctx.fillStyle = el.fill;
+            ctx.fill();
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.beginPath();
+        ctx.arc(el.x, el.y, el.radius, 0, Math.PI * 2);
+        if (el.fill && el.fill !== "transparent") {
+          ctx.fillStyle = el.fill;
+          ctx.fill();
+        }
+        ctx.stroke();
+        ctx.restore();
       } else if (el.type === "arrow") {
+        // Flow-typed arrows use semantic colors so multiple flows are visually
+        // distinct without changing the element shape.
+        const flowColor =
+          el.flow === "read"   ? "#7DA7C9" :   // info (blue)
+          el.flow === "write"  ? "#D4A574" :   // accent (tan)
+          el.flow === "async"  ? "#7FB48A" :   // good (green)
+          el.flow === "error"  ? "#C9786A" :   // bad (red)
+          el.flow === "control"? "#BDC1C6" :   // ink-2 (neutral)
+          el.color;
+        ctx.strokeStyle = flowColor;
+
+        const lineT = Math.min(1, animT / 0.88);
+        const drawX = el.x + (el.endX - el.x) * lineT;
+        const drawY = el.y + (el.endY - el.y) * lineT;
         ctx.beginPath();
         ctx.moveTo(el.x, el.y);
-        ctx.lineTo(el.endX, el.endY);
+        ctx.lineTo(drawX, drawY);
         ctx.stroke();
-        drawArrowhead(ctx, el.x, el.y, el.endX, el.endY, el.color);
+        if (animT > 0.88) {
+          const headAlpha = Math.min(1, (animT - 0.88) / 0.12);
+          ctx.save();
+          ctx.globalAlpha = headAlpha;
+          drawArrowhead(ctx, el.x, el.y, el.endX, el.endY, flowColor);
+          ctx.restore();
+        }
+        // Arrow label — rendered at midpoint with a small dark backing so it
+        // reads cleanly against the canvas. Appears in last third of animation.
+        if (el.label && animT > 0.6) {
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, (animT - 0.6) / 0.4);
+          const mx = (el.x + el.endX) / 2;
+          const my = (el.y + el.endY) / 2;
+          ctx.font = `10px ui-sans-serif, system-ui, -apple-system, sans-serif`;
+          ctx.textBaseline = "middle";
+          ctx.textAlign = "center";
+          const metrics = ctx.measureText(el.label);
+          const padX = 4, padY = 2;
+          const bw = metrics.width + padX * 2;
+          const bh = 14 + padY;
+          ctx.fillStyle = "#0B0C0E"; // bg
+          ctx.fillRect(mx - bw / 2, my - bh / 2, bw, bh);
+          ctx.fillStyle = flowColor;
+          ctx.fillText(el.label, mx, my);
+          ctx.restore();
+        }
       } else if (el.type === "text") {
+        ctx.save();
+        if (isAnimating) ctx.globalAlpha = animT;
         ctx.fillStyle = el.color;
         ctx.font = `${el.fontSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`;
         ctx.textBaseline = "alphabetic";
-        ctx.fillText(el.text, el.x, el.y);
+        // Multi-line support: split on \n, and if wrapWidth is set, wrap each
+        // line greedily on word boundaries to fit the width.
+        const lineHeight = el.fontSize * 1.3;
+        const lines: string[] = [];
+        const rawLines = (el.multiline === false) ? [el.text] : el.text.split(/\n/);
+        for (const rawLine of rawLines) {
+          if (!el.wrapWidth || el.wrapWidth <= 0) {
+            lines.push(rawLine);
+            continue;
+          }
+          const words = rawLine.split(/(\s+)/);
+          let buf = "";
+          for (const w of words) {
+            const candidate = buf + w;
+            if (ctx.measureText(candidate).width <= el.wrapWidth) {
+              buf = candidate;
+            } else {
+              if (buf.trim()) lines.push(buf.trimEnd());
+              buf = w.trimStart();
+            }
+          }
+          if (buf.trim()) lines.push(buf.trimEnd());
+        }
+        for (let i = 0; i < lines.length; i++) {
+          ctx.fillText(lines[i], el.x, el.y + i * lineHeight);
+        }
+        ctx.restore();
       }
 
       if (isSelected) {
@@ -494,6 +930,9 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
 
     const selId = selectedIdRef.current;
     for (const el of elementsRef.current) {
+      // When hidePanels is on, skip the Requirements/Scale/APIs/Data-Model
+      // left-column decorations so the architecture diagram has the full canvas.
+      if (hidePanelsRef.current && el.id.startsWith("panel:")) continue;
       drawElement(ctx, el, el.id === selId);
     }
     if (draftRef.current) {
@@ -554,6 +993,14 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     const els = elementsRef.current;
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i];
+      if (el.type === "circle") {
+        // Precise hit-test for circles — bbox would treat corners as hits.
+        const dx = wx - el.x;
+        const dy = wy - el.y;
+        const r = el.radius + 6; // small padding for easier grab
+        if (dx * dx + dy * dy <= r * r) return el;
+        continue;
+      }
       if (pointInBounds(wx, wy, elementBounds(el), 6)) return el;
     }
     return null;
@@ -620,6 +1067,7 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
         lastScreenX: e.clientX,
         lastScreenY: e.clientY,
         selectedId: null,
+        partnerIds: [],
         movedDuringDrag: false,
       };
 
@@ -709,6 +1157,16 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
         setSelectedId(hit.id);
         dragRef.current.selectedId = hit.id;
         dragRef.current.mode = "move";
+        // When the hit is a `box-<X>` rect/circle, drag its paired `lbl-<X>...`
+        // text element(s) along with it so the label stays anchored to the box.
+        if ((hit.type === "rect" || hit.type === "circle") && hit.id.startsWith("box-")) {
+          const boxKey = hit.id.slice(4);
+          dragRef.current.partnerIds = elementsRef.current
+            .filter((el) => el.id.startsWith(`lbl-${boxKey}`))
+            .map((el) => el.id);
+        } else {
+          dragRef.current.partnerIds = [];
+        }
         // Snapshot before move so undo restores positions.
         pushUndo();
       } else {
@@ -750,9 +1208,14 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
       }
 
       if (drag.mode === "move" && drag.selectedId) {
-        const id = drag.selectedId;
+        const moveIds = new Set<string>([drag.selectedId, ...drag.partnerIds]);
+        // Translate by world-space delta so dragging stays at cursor speed
+        // regardless of zoom level.
+        const z = zoomRef.current;
+        const dxWorld = dxScreen / z;
+        const dyWorld = dyScreen / z;
         elementsRef.current = elementsRef.current.map((el) =>
-          el.id === id ? translateElement(el, dxScreen, dyScreen) : el,
+          moveIds.has(el.id) ? translateElement(el, dxWorld, dyWorld) : el,
         );
         requestRedraw();
         return;
@@ -821,6 +1284,19 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
       if (dismissIfEmpty) setTextEdit(null);
       return;
     }
+    // Editing an existing label (double-click flow): replace its text in place.
+    if (textEdit.editingId) {
+      const targetId = textEdit.editingId;
+      pushUndo();
+      elementsRef.current = elementsRef.current.map((el) =>
+        el.id === targetId && el.type === "text" ? { ...el, text: trimmed } : el,
+      );
+      setTextEdit(null);
+      requestRedraw();
+      notifyChange();
+      return;
+    }
+    // Fresh-text path: new element at the click position.
     const el: TextElement = {
       id: newId(),
       type: "text",
@@ -837,6 +1313,36 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
     requestRedraw();
     notifyChange();
   }, [notifyChange, pushUndo, requestRedraw, textEdit]);
+
+  // ---------------------------------------------------------------------
+  // Double-click on a box/circle: open the text-edit overlay anchored at
+  // its label so the user can rename in place. No new element is created;
+  // commitText branches on editingId to replace the existing label's text.
+  // ---------------------------------------------------------------------
+  const onDoubleClick = useCallback(
+    (e: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (readOnly) return;
+      const world = screenToWorld(e.clientX, e.clientY);
+      const hit = hitTest(world.x, world.y);
+      if (!hit) return;
+      if (hit.type !== "rect" && hit.type !== "circle") return;
+      if (!hit.id.startsWith("box-")) return;
+      const boxKey = hit.id.slice(4);
+      const label = elementsRef.current.find(
+        (el) => el.id.startsWith(`lbl-${boxKey}`) && el.type === "text",
+      ) as TextElement | undefined;
+      if (!label) return;
+      // Anchor the editor at the label's position (one font-size up so the
+      // text input visually overlaps where the label sits).
+      setTextEdit({
+        worldX: label.x,
+        worldY: label.y - label.fontSize,
+        value: label.text,
+        editingId: label.id,
+      });
+    },
+    [hitTest, readOnly, screenToWorld],
+  );
 
   // ---------------------------------------------------------------------
   // Keyboard shortcuts
@@ -1021,6 +1527,7 @@ function WhiteboardCanvas({ onChange, readOnly = false }: WhiteboardCanvasProps,
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
+          onDoubleClick={onDoubleClick}
           onWheel={(e) => {
             e.preventDefault();
             const canvas = canvasRef.current;

@@ -141,10 +141,37 @@ export async function POST(
       score: score.communication + score.correctness + score.efficiency,
     };
     if (whiteboardSnapshot) updateValues.whiteboardSnapshot = whiteboardSnapshot;
-    await db
-      .update(interviewSessions)
-      .set(updateValues)
-      .where(eq(interviewSessions.id, sessionId));
+
+    // Retry on transient SQLITE_BUSY / SQLITE_IOERR — common in dev when the
+    // disk is near-full or another connection has the file locked.
+    const maxAttempts = 4;
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await db
+          .update(interviewSessions)
+          .set(updateValues)
+          .where(eq(interviewSessions.id, sessionId));
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        const code = (e as { code?: string })?.code ?? "";
+        const transient = code === "SQLITE_BUSY" || code === "SQLITE_LOCKED" || code.startsWith("SQLITE_IOERR");
+        if (!transient || attempt === maxAttempts) break;
+        await new Promise((r) => setTimeout(r, 250 * attempt));
+      }
+    }
+    if (lastErr) {
+      console.error("[interview/session/score] persist failed after retries", lastErr);
+      return NextResponse.json(
+        {
+          error: "Saved score in memory but failed to persist. Likely transient disk pressure — please retry.",
+          score,
+        },
+        { status: 503 },
+      );
+    }
   }
 
   return NextResponse.json(score);
