@@ -10,12 +10,13 @@ import {
   type PacingContext,
 } from "@/lib/interviewer";
 
-// Tightened from 14/16 → 11/13 on 2026-05-13 — at the prior budget,
-// <<INTERVIEW_END>> consistently landed past the ~7-min QA budget (v6 & v7
-// both ran out before the wrap-up turn). 11-soft / 13-hard pulls the natural
-// sign-off into the 5-6 min envelope without skipping deep-dive.
-const SOFT_BUDGET_TURNS = 11;
-const HARD_CAP_TURNS = 13;
+// Expanded on 2026-05-13. The earlier 22/26 budget completed in ~6 min during
+// QA because turns averaged 17s (the AI was being too brief), well under the
+// 32s/turn target. Bumped to 32 soft / 38 hard so even a fast-pacing run
+// lands in the 12-15 min range the user wants. Deep-dive + observability
+// phases also have minimum-length guidance in the system prompt.
+const SOFT_BUDGET_TURNS = 32;
+const HARD_CAP_TURNS = 38;
 import { extractPdfText } from "@/lib/extractPdf";
 import { REPO_ROOT } from "@/lib/paths";
 
@@ -369,9 +370,14 @@ You are past the soft turn budget. The interviewer should move to wrap-up THIS t
             }
 
             if (!isEnd && cxRaw.trim()) {
-              const cxContent = stripDrawBlocks(cxRaw).trim();
+              // Strip stray <<INTERVIEW_END>> markers from CX too — the
+              // candidate occasionally echoes the marker from the IV side of
+              // the same generation, and we only want the interviewer's final
+              // turn to carry the end signal.
+              const cxClean = cxRaw.replace(/<<INTERVIEW_END>>/g, "");
+              const cxContent = stripDrawBlocks(cxClean).trim();
               if (cxContent) {
-                newMessages.push({ role: "candidate", content: cxRaw, ts: Date.now() + 1 });
+                newMessages.push({ role: "candidate", content: cxClean, ts: Date.now() + 1 });
               }
             }
 

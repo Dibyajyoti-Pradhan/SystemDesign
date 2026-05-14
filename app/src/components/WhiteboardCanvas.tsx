@@ -253,6 +253,134 @@ function translateElement(
 }
 
 // ---------------------------------------------------------------------------
+// Resize handles — Excalidraw-style. Rects get 8 (4 corners + 4 edges), circles
+// get 4 cardinal radius handles, arrows get 2 endpoint handles, text gets a
+// single bottom-right handle that scales the font.
+// ---------------------------------------------------------------------------
+
+export type ResizeHandle =
+  | "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w"
+  | "start" | "end" | "fontScale";
+
+interface HandlePos { handle: ResizeHandle; x: number; y: number; }
+
+function handlePositions(el: WhiteboardElement): HandlePos[] {
+  if (el.type === "rect") {
+    let { x, y, width: w, height: h } = el;
+    if (w < 0) { x += w; w = -w; }
+    if (h < 0) { y += h; h = -h; }
+    return [
+      { handle: "nw", x, y },
+      { handle: "n",  x: x + w / 2, y },
+      { handle: "ne", x: x + w, y },
+      { handle: "e",  x: x + w, y: y + h / 2 },
+      { handle: "se", x: x + w, y: y + h },
+      { handle: "s",  x: x + w / 2, y: y + h },
+      { handle: "sw", x, y: y + h },
+      { handle: "w",  x, y: y + h / 2 },
+    ];
+  }
+  if (el.type === "circle") {
+    const { x, y, radius: r } = el;
+    return [
+      { handle: "n", x, y: y - r },
+      { handle: "e", x: x + r, y },
+      { handle: "s", x, y: y + r },
+      { handle: "w", x: x - r, y },
+    ];
+  }
+  if (el.type === "arrow") {
+    return [
+      { handle: "start", x: el.x, y: el.y },
+      { handle: "end",   x: el.endX, y: el.endY },
+    ];
+  }
+  if (el.type === "text") {
+    // Approximate one-line bbox bottom-right for the font-scale handle.
+    const w = el.text.length * el.fontSize * 0.6;
+    const h = el.fontSize * 1.2;
+    return [{ handle: "fontScale", x: el.x + w, y: el.y + h * 0.2 }];
+  }
+  return [];
+}
+
+/** Find the handle (if any) that the world point is grabbing. Tolerance is
+ *  expressed in screen pixels so it stays consistent at any zoom. */
+function hitHandle(
+  el: WhiteboardElement,
+  wx: number,
+  wy: number,
+  zoom: number,
+): ResizeHandle | null {
+  const tol = 9 / Math.max(0.1, zoom);
+  for (const h of handlePositions(el)) {
+    if (Math.abs(wx - h.x) <= tol && Math.abs(wy - h.y) <= tol) return h.handle;
+  }
+  return null;
+}
+
+/** Snapshot enough of an element at drag-start that resize can compute the
+ *  new geometry purely from start-state + cumulative pointer delta. */
+type ResizeStart =
+  | { kind: "rect"; x: number; y: number; w: number; h: number }
+  | { kind: "circle"; cx: number; cy: number; r: number }
+  | { kind: "arrow"; x: number; y: number; endX: number; endY: number }
+  | { kind: "text"; x: number; y: number; fontSize: number; len: number };
+
+function snapshotForResize(el: WhiteboardElement): ResizeStart | null {
+  if (el.type === "rect")   return { kind: "rect",   x: el.x, y: el.y, w: el.width, h: el.height };
+  if (el.type === "circle") return { kind: "circle", cx: el.x, cy: el.y, r: el.radius };
+  if (el.type === "arrow")  return { kind: "arrow",  x: el.x, y: el.y, endX: el.endX, endY: el.endY };
+  if (el.type === "text")   return { kind: "text",   x: el.x, y: el.y, fontSize: el.fontSize, len: el.text.length };
+  return null;
+}
+
+function applyResize(
+  el: WhiteboardElement,
+  handle: ResizeHandle,
+  snap: ResizeStart,
+  wx: number,
+  wy: number,
+): WhiteboardElement {
+  if (el.type === "rect" && snap.kind === "rect") {
+    let x1 = snap.x, y1 = snap.y, x2 = snap.x + snap.w, y2 = snap.y + snap.h;
+    switch (handle) {
+      case "nw": x1 = wx; y1 = wy; break;
+      case "n":  y1 = wy; break;
+      case "ne": x2 = wx; y1 = wy; break;
+      case "e":  x2 = wx; break;
+      case "se": x2 = wx; y2 = wy; break;
+      case "s":  y2 = wy; break;
+      case "sw": x1 = wx; y2 = wy; break;
+      case "w":  x1 = wx; break;
+    }
+    let nx = Math.min(x1, x2);
+    let ny = Math.min(y1, y2);
+    let nw = Math.max(10, Math.abs(x2 - x1));
+    let nh = Math.max(10, Math.abs(y2 - y1));
+    return { ...el, x: nx, y: ny, width: nw, height: nh };
+  }
+  if (el.type === "circle" && snap.kind === "circle") {
+    const newR = Math.max(6, Math.hypot(wx - snap.cx, wy - snap.cy));
+    return { ...el, radius: newR };
+  }
+  if (el.type === "arrow" && snap.kind === "arrow") {
+    if (handle === "start") return { ...el, x: wx, y: wy };
+    if (handle === "end")   return { ...el, endX: wx, endY: wy };
+  }
+  if (el.type === "text" && snap.kind === "text" && handle === "fontScale") {
+    // Distance from baseline to pointer scales the font. Floor at 8px so it
+    // stays selectable, cap at 96px so it doesn't engulf the canvas.
+    const baseDist = Math.max(8, snap.fontSize * 1.2);
+    const ptrDist = Math.max(8, wy - snap.y);
+    const ratio = ptrDist / baseDist;
+    const newSize = Math.max(8, Math.min(96, Math.round(snap.fontSize * ratio)));
+    return { ...el, fontSize: newSize };
+  }
+  return el;
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
@@ -264,6 +392,11 @@ export interface WhiteboardHandle {
   /** Add elements WITHOUT the draw-in animation. Used on page reload to
    *  rebuild the whiteboard from the persisted transcript instantly. */
   restoreElements: (elements: WhiteboardElement[]) => void;
+  /** Convert canvas/world coordinates to container-screen coordinates,
+   *  honoring current pan/zoom. Used by overlay cursors so they appear ON
+   *  the element being discussed, not at the raw world coord (which sits at
+   *  a totally different screen position once the canvas is zoomed). */
+  worldToScreen: (wx: number, wy: number) => { x: number; y: number };
 }
 
 export interface WhiteboardCanvasProps {
@@ -305,7 +438,7 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
   // Pointer / drag state.
   const draftRef = useRef<WhiteboardElement | null>(null);
   const dragRef = useRef<{
-    mode: "none" | "draw" | "move" | "pan" | "erase";
+    mode: "none" | "draw" | "move" | "pan" | "erase" | "resize";
     startScreenX: number;
     startScreenY: number;
     lastScreenX: number;
@@ -315,6 +448,13 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
      *  `lbl-<X>...` text elements that should move with the box. */
     partnerIds: string[];
     movedDuringDrag: boolean;
+    /** For resize mode — which handle is being dragged + element snapshot at
+     *  drag-start so geometry can be recomputed from absolute pointer pos. */
+    resizeHandle: ResizeHandle | null;
+    resizeSnap: ResizeStart | null;
+    /** Snapshot of paired label positions so resize of the parent rect can
+     *  keep labels anchored to the rect's top-left. */
+    partnerSnap: Array<{ id: string; dx: number; dy: number }>;
   }>({
     mode: "none",
     startScreenX: 0,
@@ -324,6 +464,9 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
     selectedId: null,
     partnerIds: [],
     movedDuringDrag: false,
+    resizeHandle: null,
+    resizeSnap: null,
+    partnerSnap: [],
   });
 
   const [tool, setTool] = useState<Tool>("select");
@@ -503,9 +646,12 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     let any = false;
     for (const el of elementsRef.current) {
-      // Skip the left-column panels — they're always anchored to the viewport
-      // and shouldn't drive zoom.
+      // Skip the left-column panels AND the question-title band — they're
+      // anchored to the viewport's panel-column and shouldn't drive zoom.
+      // Including them dragged bbox.minX to ~20 and pushed the architecture
+      // off the right edge until the user manually panned.
       if (el.id.startsWith("panel:")) continue;
+      if (el.id === "q-title") continue;
       any = true;
       if (el.type === "rect") {
         if (el.x < minX) minX = el.x;
@@ -682,6 +828,10 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
       // After paint, fit the camera once so a reloaded interview shows the
       // full state, even if boxes ran off the original viewport.
       setTimeout(() => fitToContent(), 50);
+    },
+    worldToScreen(wx: number, wy: number) {
+      const z = zoomRef.current;
+      return { x: wx * z + panRef.current.x, y: wy * z + panRef.current.y };
     },
   }), [pushUndo, requestRedraw, notifyChange, computeContentBbox, fitToContent]);
 
@@ -901,6 +1051,21 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
           b.maxY - b.minY + 8,
         );
         ctx.restore();
+
+        // Resize handles — small white squares with a blue outline. Sized in
+        // screen pixels (divide by zoom) so they stay tappable at any zoom.
+        const z = zoomRef.current;
+        const handleSize = 8 / z;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.lineWidth = Math.max(0.5, 1 / z);
+        ctx.strokeStyle = "#1971c2";
+        ctx.fillStyle = "#FFFFFF";
+        for (const h of handlePositions(el)) {
+          ctx.fillRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+          ctx.strokeRect(h.x - handleSize / 2, h.y - handleSize / 2, handleSize, handleSize);
+        }
+        ctx.restore();
       }
     },
     [drawArrowhead],
@@ -1069,6 +1234,9 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
         selectedId: null,
         partnerIds: [],
         movedDuringDrag: false,
+        resizeHandle: null,
+        resizeSnap: null,
+        partnerSnap: [],
       };
 
       if (t === "pen") {
@@ -1151,6 +1319,40 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
         return;
       }
 
+      // Resize-handle hit-test FIRST — if a resize handle of the currently
+      // selected element is grabbed, start resize mode regardless of any
+      // element behind it. This is how Excalidraw lets you pull a corner past
+      // the edge of an overlapping element.
+      const currentSelected = selectedIdRef.current
+        ? elementsRef.current.find((el) => el.id === selectedIdRef.current) ?? null
+        : null;
+      if (currentSelected) {
+        const handle = hitHandle(currentSelected, world.x, world.y, zoomRef.current);
+        if (handle) {
+          dragRef.current.selectedId = currentSelected.id;
+          dragRef.current.mode = "resize";
+          dragRef.current.resizeHandle = handle;
+          dragRef.current.resizeSnap = snapshotForResize(currentSelected);
+          // Snapshot paired label offsets so they slide with the box's NW corner.
+          if (
+            (currentSelected.type === "rect" || currentSelected.type === "circle") &&
+            currentSelected.id.startsWith("box-")
+          ) {
+            const boxKey = currentSelected.id.slice(4);
+            const parentX = currentSelected.x;
+            const parentY = currentSelected.y;
+            dragRef.current.partnerSnap = elementsRef.current
+              .filter((el) => el.id.startsWith(`lbl-${boxKey}`))
+              .map((el) => ({ id: el.id, dx: el.x - parentX, dy: el.y - parentY }));
+          } else {
+            dragRef.current.partnerSnap = [];
+          }
+          pushUndo();
+          requestRedraw();
+          return;
+        }
+      }
+
       // Select
       const hit = hitTest(world.x, world.y);
       if (hit) {
@@ -1221,6 +1423,36 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
         return;
       }
 
+      if (drag.mode === "resize" && drag.selectedId && drag.resizeHandle && drag.resizeSnap) {
+        const handle = drag.resizeHandle;
+        const snap = drag.resizeSnap;
+        const partnerSnap = drag.partnerSnap;
+        elementsRef.current = elementsRef.current.map((el) => {
+          if (el.id === drag.selectedId) {
+            return applyResize(el, handle, snap, world.x, world.y);
+          }
+          // Re-anchor paired labels to the parent's new top-left (rects/circles).
+          if (partnerSnap.length > 0) {
+            const partner = partnerSnap.find((p) => p.id === el.id);
+            if (partner) {
+              const parent = elementsRef.current.find((p) => p.id === drag.selectedId);
+              if (parent) {
+                if (parent.type === "rect" && el.type === "text") {
+                  return { ...el, x: parent.x + partner.dx, y: parent.y + partner.dy };
+                }
+                if (parent.type === "circle" && el.type === "text") {
+                  // For circles the label is centered — slide proportionally with the radius.
+                  return { ...el, x: parent.x + partner.dx, y: parent.y + partner.dy };
+                }
+              }
+            }
+          }
+          return el;
+        });
+        requestRedraw();
+        return;
+      }
+
       if (drag.mode === "pan") {
         panRef.current.x += dxScreen;
         panRef.current.y += dyScreen;
@@ -1264,6 +1496,15 @@ function WhiteboardCanvas({ onChange, readOnly = false, hidePanels = false, rese
         } else {
           notifyChange();
         }
+      } else if (drag.mode === "resize") {
+        if (!drag.movedDuringDrag) {
+          undoStackRef.current.pop();
+        } else {
+          notifyChange();
+        }
+        drag.resizeHandle = null;
+        drag.resizeSnap = null;
+        drag.partnerSnap = [];
       } else if (drag.mode === "erase") {
         if (drag.movedDuringDrag) notifyChange();
       }

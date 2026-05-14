@@ -49,6 +49,9 @@ interface DrawCmd {
   move?: DrawMove[];
   remove?: string[];
   focus?: string[] | "all";
+  /** Pulse a colored outline around one or more boxes for ~12s — used when
+   *  the speaker is verbally focused on a specific component. */
+  highlight?: string | string[];
 }
 
 const DRAW_RE = /<<DRAW>>([\s\S]*?)<<END_DRAW>>/;
@@ -83,14 +86,23 @@ function stripMeta(text: string): string {
  *  auto-fitting, keeping the architecture from overlapping the panels. */
 const PANEL_COLUMN_RESERVED_PX = 320;
 
+// Question-title band sits ABOVE the panels, sharing their column x so the
+// title visually anchors the Requirements section.
+const TITLE_BAND_Y = 8;
+const TITLE_BAND_H = 24;
+const PANELS_TOP_Y = TITLE_BAND_Y + TITLE_BAND_H + 8; // 40
+
+// Bordered Requirements panel (keeps the "REQUIREMENTS" all-caps header chrome)
+// but now with enough height to fit the free-form content style: Requirements +
+// Roles (with descriptions) + Qualities/NFR + Nice-to-Haves divider.
 const PANEL_ZONES: Record<string, { x: number; y: number; w: number; h: number; title: string; color: string }> = {
-  requirements:  { x: 20,  y: 20,  w: 280, h: 230, title: "Requirements",  color: "#E7E8EA" },
-  scale:         { x: 20,  y: 264, w: 260, h: 150, title: "Scale / BOE",   color: "#7DA7C9" },
-  apis:          { x: 20,  y: 428, w: 280, h: 240, title: "APIs",          color: "#D4A574" },
-  datamodel:     { x: 20,  y: 682, w: 260, h: 130, title: "Data Model",    color: "#C9A07A" },
+  requirements:  { x: 20,  y: PANELS_TOP_Y,        w: 300, h: 540, title: "Requirements",  color: "#E7E8EA" },
+  scale:         { x: 20,  y: PANELS_TOP_Y + 554,  w: 260, h: 150, title: "Scale / BOE",   color: "#7DA7C9" },
+  apis:          { x: 20,  y: PANELS_TOP_Y + 718,  w: 280, h: 240, title: "APIs",          color: "#D4A574" },
+  datamodel:     { x: 20,  y: PANELS_TOP_Y + 972,  w: 260, h: 130, title: "Data Model",    color: "#C9A07A" },
   // Legacy aliases — fold any FN/NFN-era panel ids back into requirements.
-  functional:    { x: 20,  y: 20,  w: 280, h: 230, title: "Requirements",  color: "#E7E8EA" },
-  nonfunctional: { x: 20,  y: 20,  w: 280, h: 230, title: "Requirements",  color: "#E7E8EA" },
+  functional:    { x: 20,  y: PANELS_TOP_Y,        w: 300, h: 540, title: "Requirements",  color: "#E7E8EA" },
+  nonfunctional: { x: 20,  y: PANELS_TOP_Y,        w: 300, h: 540, title: "Requirements",  color: "#E7E8EA" },
 };
 
 const PANEL_TITLE_FONT = 11;
@@ -98,33 +110,41 @@ const PANEL_LINE_FONT  = 12;
 const PANEL_LINE_H     = 18;
 const PANEL_CONTENT_Y  = 38; // y offset inside framed panels (when title is shown)
 
-function buildPanelElements(panel: DrawPanel, existingLineCount: number): WhiteboardElement[] {
+/** AI sometimes emits a literal "Requirements:" header even though the panel
+ * chrome already labels the section — strip it so we don't see "REQUIREMENTS"
+ * stacked over "Requirements:". Handles trailing colon, whitespace, and any
+ * casing. */
+function stripRedundantHeader(lines: string[], panelId: string): string[] {
+  const out = [...lines];
+  // Drop leading empty lines.
+  while (out.length > 0 && !out[0].trim()) out.shift();
+  if (out.length === 0) return out;
+  const head = out[0].trim().toLowerCase().replace(/[:\s]+$/, "");
+  // Map alias panel ids to their canonical headers we want to dedupe.
+  const headers: Record<string, string[]> = {
+    requirements:  ["requirements"],
+    functional:    ["requirements", "functional"],
+    nonfunctional: ["requirements", "non-functional", "nonfunctional"],
+    scale:         ["scale", "scale / boe", "boe", "back of envelope"],
+    apis:          ["apis", "api"],
+    datamodel:     ["data model", "datamodel", "data-model"],
+  };
+  if ((headers[panelId] ?? []).includes(head)) out.shift();
+  return out;
+}
+
+function buildPanelElements(panel: DrawPanel, _existingLineCount: number): WhiteboardElement[] {
   const zone = PANEL_ZONES[panel.id];
   if (!zone) return [];
   const els: WhiteboardElement[] = [];
 
   const chromeless = zone.title === "";
   const lineTopOffset = chromeless ? 16 : PANEL_CONTENT_Y;
+  const cleaned = stripRedundantHeader(panel.lines, panel.id);
 
-  // Text lines first (so they appear before the frame, like a real person
-  // writes notes then optionally boxes them). The bg/title chrome comes after.
-  panel.lines.forEach((line, i) => {
-    const lineIdx = existingLineCount + i;
-    const yPos = zone.y + lineTopOffset + lineIdx * PANEL_LINE_H;
-    if (yPos + PANEL_LINE_FONT > zone.y + zone.h) return;
-    els.push({
-      id: `panel:${panel.id}:line:${lineIdx}`,
-      type: "text",
-      x: zone.x + 8, y: yPos,
-      color: "#E7E8EA",
-      strokeWidth: 1,
-      text: line,
-      fontSize: PANEL_LINE_FONT,
-      wrapWidth: zone.w - 16,
-    } as WhiteboardElement);
-  });
-
-  if (!chromeless && (!panel.append || existingLineCount === 0)) {
+  // Chrome (bg + title) first so the multi-line body renders ON TOP, never
+  // under the title. We replace the entire panel on every emit (see caller).
+  if (!chromeless) {
     els.push({
       id: `panel:${panel.id}:bg`,
       type: "rect",
@@ -145,6 +165,25 @@ function buildPanelElements(panel: DrawPanel, existingLineCount: number): Whiteb
     } as WhiteboardElement);
   }
 
+  // Render the entire body as ONE multi-line text element. The canvas's
+  // wrapWidth handles long lines without overlap, and per-line spacing is
+  // governed by the font's natural line-height — no manual y math needed,
+  // so wrapped lines no longer collide with the next logical line.
+  if (cleaned.length > 0) {
+    const body = cleaned.join("\n");
+    els.push({
+      id: `panel:${panel.id}:body`,
+      type: "text",
+      x: zone.x + 8,
+      y: zone.y + lineTopOffset + PANEL_LINE_FONT, // y is baseline; offset by font size
+      color: "#E7E8EA",
+      strokeWidth: 1,
+      text: body,
+      fontSize: PANEL_LINE_FONT,
+      wrapWidth: zone.w - 16,
+    } as WhiteboardElement);
+  }
+
   return els;
 }
 
@@ -152,19 +191,28 @@ function buildPanelElements(panel: DrawPanel, existingLineCount: number): Whiteb
 // Grid → pixel layout (shifted right to avoid panel column)
 // ---------------------------------------------------------------------------
 
-const CELL_W = 190;
-const CELL_H = 90;
+// Tightened cell pitch from 190x90 → 172x76 — boxes now sit close enough
+// that they read as a unified diagram instead of scattered islands, while
+// still leaving room for arrow labels in the gutter.
+const CELL_W = 172;
+const CELL_H = 76;
 const GRID_X = 310;  // shifted right to avoid left panel column
 const GRID_Y = 56;
 const BOX_W = 154;
 const BOX_H = 52;
 
-interface NodeRect { x: number; y: number; cx: number; cy: number; w: number; h: number; }
+interface NodeRect {
+  x: number; y: number; cx: number; cy: number; w: number; h: number;
+  /** Set by the box-emit path so arrowEndpoints can attach to the circle's
+   *  perimeter rather than the bounding box edge. */
+  shape?: "rect" | "circle";
+  radius?: number;
+}
 
 function gridBox(c: number, r: number): NodeRect {
   const x = GRID_X + c * CELL_W;
   const y = GRID_Y + r * CELL_H;
-  return { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2, w: BOX_W, h: BOX_H };
+  return { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2, w: BOX_W, h: BOX_H, shape: "rect" };
 }
 
 /** World-space center for cursor pre-positioning. Approximate — the cursor
@@ -179,14 +227,30 @@ function elementCenter(el: WhiteboardElement): { x: number; y: number } | null {
   return null;
 }
 
+/** Compute the point on a node's edge where an arrow heading toward target
+ *  (tx, ty) should stop. For rects, intersect the line with the rect's edge;
+ *  for circles, advance from center toward target by exactly the radius so
+ *  the arrowhead touches the perimeter (no visible gap, no overshoot). */
+function edgePoint(node: NodeRect, tx: number, ty: number): { x: number; y: number } {
+  const dx = tx - node.cx, dy = ty - node.cy;
+  if (dx === 0 && dy === 0) return { x: node.cx, y: node.cy };
+  if (node.shape === "circle" && node.radius != null) {
+    const r = node.radius;
+    const len = Math.hypot(dx, dy);
+    return { x: node.cx + (dx / len) * r, y: node.cy + (dy / len) * r };
+  }
+  // Rect: parameterize the ray and clamp at first edge crossing.
+  const hw = node.w / 2, hh = node.h / 2;
+  const tX = dx === 0 ? Infinity : hw / Math.abs(dx);
+  const tY = dy === 0 ? Infinity : hh / Math.abs(dy);
+  const t = Math.min(tX, tY);
+  return { x: node.cx + dx * t, y: node.cy + dy * t };
+}
+
 function arrowEndpoints(src: NodeRect, dst: NodeRect): [number, number, number, number] {
-  const dx = dst.cx - src.cx, dy = dst.cy - src.cy;
-  const horiz = Math.abs(dx) >= Math.abs(dy);
-  const sx = horiz ? (dx > 0 ? src.x + src.w : src.x) : src.cx;
-  const sy = horiz ? src.cy : (dy > 0 ? src.y + src.h : src.y);
-  const ex = horiz ? (dx > 0 ? dst.x : dst.x + dst.w) : dst.cx;
-  const ey = horiz ? dst.cy : (dy > 0 ? dst.y : dst.y + dst.h);
-  return [sx, sy, ex, ey];
+  const s = edgePoint(src, dst.cx, dst.cy);
+  const d = edgePoint(dst, src.cx, src.cy);
+  return [s.x, s.y, d.x, d.y];
 }
 
 function buildElements(
@@ -262,12 +326,19 @@ function buildElements(
       autoSlot++;
     }
     const rect = gridBox(c, r);
-    nodeMap.set(box.id, rect);
     usedLabels.add(box.label);
     if (!firstNewPos) firstNewPos = { x: rect.cx, y: rect.cy };
 
     const isCircle = box.shape === "circle";
     const replicas = Math.max(1, Math.min(3, box.replicas ?? 1));
+    // Stamp shape onto the nodeMap so arrowEndpoints can attach to the
+    // circle's perimeter rather than its bounding box (which left big gaps).
+    if (isCircle) {
+      const radius = Math.min(BOX_W, BOX_H) / 2 - 2;
+      nodeMap.set(box.id, { ...rect, shape: "circle", radius });
+    } else {
+      nodeMap.set(box.id, rect);
+    }
 
     if (isCircle) {
       // Circle is centered in the cell; use BOX_H/2 as radius for compactness.
@@ -292,11 +363,21 @@ function buildElements(
         wrapWidth: radius * 2 - 12,
       } as WhiteboardElement);
     } else {
+      // Grow the rect vertically to fit multi-line labels (interior bullets).
+      // Real interview boxes often have 2-4 lines of annotation inside.
+      const lineCount = Math.max(1, box.label.split("\n").length);
+      const labelLineH = 16;
+      const boxH = lineCount > 1
+        ? Math.min(BOX_H + (lineCount - 1) * labelLineH, BOX_H + 3 * labelLineH)
+        : BOX_H;
+      // Patch the height back into the nodeMap so arrowEndpoints + resize use it.
+      const stamped = nodeMap.get(box.id);
+      if (stamped) nodeMap.set(box.id, { ...stamped, h: boxH });
       els.push({
         id: `box-${box.id}`,
         type: "rect",
         x: rect.x, y: rect.y,
-        width: BOX_W, height: BOX_H,
+        width: BOX_W, height: boxH,
         color,
         fill: box.style === "note" ? `${color}18` : "transparent",
         strokeWidth: box.style === "note" ? 1 : 1.8,
@@ -309,6 +390,41 @@ function buildElements(
         color, strokeWidth: 1,
         text: box.label, fontSize: 12,
         wrapWidth: BOX_W - 16,
+      } as WhiteboardElement);
+    }
+  }
+
+  // Highlight directive — pulse a colored outline around the named box(es)
+  // for ~12s so the observer's eye snaps to the one being discussed. Old
+  // highlights are dropped on every new emit (so only the current topic
+  // shows up at any time).
+  whiteboardRef.current?.removeElementsByPrefix("hl-");
+  const hlIds: string[] = cmd.highlight
+    ? (Array.isArray(cmd.highlight) ? cmd.highlight : [cmd.highlight])
+    : [];
+  for (const hlId of hlIds) {
+    const target = nodeMap.get(hlId);
+    if (!target) continue;
+    const pad = 6;
+    if (target.shape === "circle" && target.radius != null) {
+      els.push({
+        id: `hl-${hlId}`,
+        type: "circle",
+        x: target.cx, y: target.cy,
+        radius: target.radius + pad,
+        color: "#FFB347", // accent-warm, contrasts with both IV/CX colors
+        fill: "transparent",
+        strokeWidth: 3,
+      } as WhiteboardElement);
+    } else {
+      els.push({
+        id: `hl-${hlId}`,
+        type: "rect",
+        x: target.x - pad, y: target.y - pad,
+        width: target.w + pad * 2, height: target.h + pad * 2,
+        color: "#FFB347",
+        fill: "transparent",
+        strokeWidth: 3,
       } as WhiteboardElement);
     }
   }
@@ -435,20 +551,53 @@ export function primeAudio() {
 }
 
 // ---------------------------------------------------------------------------
-// Cancel handle so the parent can barge in (End button, Ask modal) without
-// holding refs to individual audio elements / synth utterances.
+// Cancel / Pause / Resume handles so the parent can barge in (End, Ask modal)
+// or freeze playback YouTube-style without losing the current playhead. Cancel
+// destroys the queue; pause/resume just toggles the audio element.
 // ---------------------------------------------------------------------------
 let currentSpeechCancel: (() => void) | null = null;
+let currentSpeechPause: (() => void) | null = null;
+let currentSpeechResume: (() => void) | null = null;
+/** True once pause() has been called but resume() hasn't. Lets togglePlay
+ *  decide between "resume current utterance" and "start a fresh exchange". */
+let currentSpeechPaused = false;
 
 function cancelCurrentSpeech() {
   if (currentSpeechCancel) {
     try { currentSpeechCancel(); } catch {}
     currentSpeechCancel = null;
   }
+  currentSpeechPause = null;
+  currentSpeechResume = null;
+  currentSpeechPaused = false;
   if (typeof window !== "undefined" && window.speechSynthesis) {
     window.speechSynthesis.cancel();
   }
   stopWatchdog();
+}
+
+function pauseCurrentSpeech() {
+  if (currentSpeechPause) {
+    try { currentSpeechPause(); } catch {}
+    currentSpeechPaused = true;
+  }
+  // Pause the Web Speech fallback too — synthesis.pause is supported on
+  // Chrome / Safari and the watchdog resume() is gated on .speaking.
+  if (typeof window !== "undefined" && window.speechSynthesis?.speaking) {
+    try { window.speechSynthesis.pause(); } catch {}
+  }
+}
+
+function resumeCurrentSpeech(): boolean {
+  let resumed = false;
+  if (currentSpeechResume) {
+    try { currentSpeechResume(); resumed = true; } catch {}
+    currentSpeechPaused = false;
+  }
+  if (typeof window !== "undefined" && window.speechSynthesis?.paused) {
+    try { window.speechSynthesis.resume(); resumed = true; } catch {}
+  }
+  return resumed;
 }
 
 function speakWithWebSpeech(
@@ -517,6 +666,9 @@ function speakTurn(
 
   const finish = () => {
     if (currentSpeechCancel === cancel) currentSpeechCancel = null;
+    currentSpeechPause = null;
+    currentSpeechResume = null;
+    currentSpeechPaused = false;
     onEnd();
   };
 
@@ -529,6 +681,12 @@ function speakTurn(
     // Start-click gesture carries across all chunks.
     if (!sharedAudio) sharedAudio = new Audio();
     sharedAudio.volume = 1;
+
+    // Expose YouTube-style pause/resume on the SAME audio element so togglePlay
+    // can freeze the playhead and resume from the exact ms. Cleared at finish()
+    // / cancel(). currentTime persists across pause/play on all browsers.
+    currentSpeechPause = () => { try { sharedAudio?.pause(); } catch {} };
+    currentSpeechResume = () => { sharedAudio?.play().catch(() => {}); };
 
     const fetchChunk = (chunk: string) =>
       fetch("/api/tts/stream", {
@@ -590,30 +748,51 @@ function speakTurn(
 // Cursor animation
 // ---------------------------------------------------------------------------
 
+/** Animate a role's cursor toward the element it should be pointing at.
+ *  The cursor reads `targetRef.current` every frame so changes (driven by
+ *  applyDrawingProgressive) feel like the engineer literally moving their
+ *  hand to the next box. A subtle 6-7px hover keeps the cursor alive without
+ *  the prior implementation's wander, which made the cursor look untethered
+ *  from what was being said. */
 function animateCursor(
   set: (p: CursorPos) => void,
   stopRef: { current: boolean },
   bounds: { w: number; h: number },
-  target?: { x: number; y: number },
+  targetRef: { current: { x: number; y: number } | undefined },
+  /** Shared position handed across role switches so when IV → CX the new
+   *  cursor STARTS from where the previous one left, then smoothly slides to
+   *  its target instead of teleporting from the default 40%/30% park. */
+  lastPosRef?: { current: { x: number; y: number } | null },
 ) {
-  let cx = bounds.w * 0.4, cy = bounds.h * 0.3;
-  let tx = target?.x ?? cx, ty = target?.y ?? cy;
-  let phase: "goto" | "wander" = target ? "goto" : "wander";
-  let lastPick = 0;
+  // Seed from the prior role's last known position; otherwise park at 40/30.
+  let cx = lastPosRef?.current?.x ?? bounds.w * 0.4;
+  let cy = lastPosRef?.current?.y ?? bounds.h * 0.3;
   const raf = { id: 0 };
   function tick(now: number) {
-    if (stopRef.current) { set({ x: cx, y: cy, visible: false }); return; }
-    if (phase === "goto") {
-      cx += (tx - cx) * 0.09; cy += (ty - cy) * 0.09;
-      if (Math.hypot(tx - cx, ty - cy) < 6) phase = "wander";
-    } else {
-      if (now - lastPick > 900 + Math.random() * 900) {
-        tx = Math.max(40, Math.min(bounds.w - 40, tx + (Math.random() - 0.5) * 260));
-        ty = Math.max(40, Math.min(bounds.h - 40, ty + (Math.random() - 0.5) * 160));
-        lastPick = now;
-      }
-      cx += (tx - cx) * 0.07; cy += (ty - cy) * 0.07;
+    if (stopRef.current) {
+      // Persist final position so the next role's animateCursor starts here.
+      if (lastPosRef) lastPosRef.current = { x: cx, y: cy };
+      set({ x: cx, y: cy, visible: false });
+      return;
     }
+    const target = targetRef.current;
+    let tx: number, ty: number;
+    if (target) {
+      // Small bobble around the target so the cursor doesn't look pinned to
+      // a single pixel — feels like a hand drifting <10px while the person
+      // talks. Sinusoid is deterministic / cheap; no random wander.
+      const t = now / 700;
+      tx = target.x + Math.cos(t) * 6;
+      ty = target.y + Math.sin(t * 0.8) * 4;
+    } else {
+      tx = cx;
+      ty = cy;
+    }
+    // Ease toward the target — slow enough to feel intentional, fast enough
+    // that the cursor reaches a new element before the next sentence lands.
+    cx += (tx - cx) * 0.12;
+    cy += (ty - cy) * 0.12;
+    if (lastPosRef) lastPosRef.current = { x: cx, y: cy };
     set({ x: cx, y: cy, visible: true });
     raf.id = requestAnimationFrame(tick);
   }
@@ -770,23 +949,32 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Shared cursor-position carry: when IV stops and CX starts, the new
+  // cursor begins from the prior cursor's last x/y so the visual is
+  // continuous — no teleport to the default 40/30 park.
+  const sharedCursorPosRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
     if (!speaker) return;
     const w = containerRef.current?.clientWidth ?? 800;
     const h = containerRef.current?.clientHeight ?? 600;
     const stop = { current: false };
     const setter = speaker === "interviewer" ? setIvCursor : setCxCursor;
-    const cancel = animateCursor(setter, stop, { w, h }, lastDrawTargetRef.current);
+    const cancel = animateCursor(setter, stop, { w, h }, lastDrawTargetRef, sharedCursorPosRef);
     return () => { stop.current = true; cancel(); };
   }, [speaker]);
 
   function drawTitleOnce() {
     if (titleDrawnRef.current || !whiteboardRef.current) return;
     titleDrawnRef.current = true;
+    // Anchor the question title above the Requirements panel (same x column,
+    // y just under the canvas top). Reads as "AMAZON E-COMMERCE → Requirements"
+    // and groups visually with the left-column notes the way a real interviewer
+    // would write the problem name above their scratch pad.
     whiteboardRef.current.addElements([{
       id: "q-title", type: "text",
-      x: GRID_X, y: 20, color: "#5E636C",
-      strokeWidth: 1, text: questionTitle.toUpperCase(), fontSize: 11,
+      x: 20, y: TITLE_BAND_Y + 14, color: "#9CA3AF",
+      strokeWidth: 1, text: questionTitle.toUpperCase(), fontSize: 13,
+      wrapWidth: 280,
     } as WhiteboardElement]);
   }
 
@@ -823,6 +1011,20 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
     const wordCount = spokenText.split(/\s+/).filter(Boolean).length;
     const estimatedMs = Math.max(4000, (wordCount / 150) * 60 * 1000); // ~150 wpm
     const usableMs = estimatedMs * 0.8; // don't go past 80% of speech
+
+    // Project world coords (where elements live) into the cursor overlay's
+    // coordinate system. WhiteboardCanvas.worldToScreen returns coords
+    // relative to the canvas element; the canvas sits 40px below the toolbar
+    // inside the wrapping <div ref={containerRef}>, so we add 40px in y to
+    // get the actual on-screen position the cursor div should render at.
+    const TOOLBAR_H = 40;
+    const w2s = (p: { x: number; y: number }) => {
+      const handle = whiteboardRef.current;
+      if (!handle) return p;
+      const s = handle.worldToScreen(p.x, p.y);
+      return { x: s.x, y: s.y + TOOLBAR_H };
+    };
+
     elements.forEach((el, i) => {
       const addDelay = i === 0
         ? 800
@@ -830,14 +1032,32 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
       // Move the role cursor to the element's center ~250ms BEFORE the
       // element actually renders, so the cursor "arrives" first — matches how
       // a real engineer reaches the spot, then draws.
-      const target = elementCenter(el);
-      if (target) {
+      const worldTarget = elementCenter(el);
+      if (worldTarget) {
         const preMoveAt = Math.max(0, addDelay - 250);
-        setTimeout(() => { lastDrawTargetRef.current = target; }, preMoveAt);
+        setTimeout(() => { lastDrawTargetRef.current = w2s(worldTarget); }, preMoveAt);
       }
       setTimeout(() => {
         whiteboardRef.current?.addElements([el]);
       }, addDelay);
+
+      // For ARROWS specifically: after the arrow renders, trace the cursor
+      // from source → midpoint → endpoint over ~900ms. This is how a real
+      // interviewer's hand sweeps along the request flow when they say
+      // "client hits the API, which writes to the queue, which the worker
+      // consumes". Without this the cursor parks at the arrow's midpoint
+      // and the explanation feels lifeless.
+      if (el.type === "arrow") {
+        const startPt = { x: el.x, y: el.y };
+        const midPt = { x: (el.x + el.endX) / 2, y: (el.y + el.endY) / 2 };
+        const endPt = { x: el.endX, y: el.endY };
+        // Stagger waypoints AFTER the arrow renders so the trace follows the
+        // arrow's stroke-in animation. Project each into screen coords at
+        // emit-time so the cursor follows the visible arrow.
+        setTimeout(() => { lastDrawTargetRef.current = w2s(startPt); }, addDelay + 100);
+        setTimeout(() => { lastDrawTargetRef.current = w2s(midPt); },   addDelay + 450);
+        setTimeout(() => { lastDrawTargetRef.current = w2s(endPt); },   addDelay + 800);
+      }
     });
   }
 
@@ -955,16 +1175,17 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
                 () => {
                   setSpeaker(null);
                   if (isPlayingRef.current && !endedRef.current) {
-                    // 1200ms beat between candidate finishing and interviewer
-                    // pushing back. Real interviewers take ~1-2s to process
-                    // before responding — the prior 150ms made it sound like
-                    // an oral exam, not a conversation.
-                    setTimeout(() => { void exchangeAndSpeak(); }, 1200);
+                    // 250ms breath between candidate-end and the next IV start.
+                    // The next /exchange has been prefetching since the moment
+                    // candidate audio started, so by now it's almost always in
+                    // hand — this short pause is purely conversational rhythm,
+                    // not a real wait. No overlap, no perceptible latency.
+                    setTimeout(() => { void exchangeAndSpeak(); }, 250);
                   }
                 },
               );
             } else if (isPlayingRef.current && !endedRef.current) {
-              setTimeout(() => { void exchangeAndSpeak(); }, 1200);
+              setTimeout(() => { void exchangeAndSpeak(); }, 250);
             }
           },
         );
@@ -1048,13 +1269,21 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
   function togglePlay() {
     if (ended) return;
     if (isPlaying) {
+      // PAUSE — YouTube-style. Freeze the audio at its current ms, hold the
+      // prefetched next exchange in memory, and DO NOT add anything new to
+      // the transcript. What's already there is what the user has actually
+      // heard (or is in the middle of hearing); resume continues from the
+      // exact playhead. We deliberately don't cancel the pending fetch so
+      // resuming feels instant — the stream is already in flight.
       setIsPlaying(false); isPlayingRef.current = false;
-      cancelCurrentSpeech(); setSpeaker(null);
-      // Drop the prefetched stream — it's stale once paused; we'll re-fetch
-      // on resume so the response reflects any steers added during the pause.
-      cancelPendingNextExchange();
+      pauseCurrentSpeech();
+      // Keep speaker indicator visible so the observer can tell who was
+      // talking when paused; cleared on End / Ask / natural turn-end.
     } else {
       setIsPlaying(true); isPlayingRef.current = true;
+      // If there's a paused utterance, prefer resuming it over starting a new
+      // exchange — the user's intent is to continue from where they paused.
+      if (currentSpeechPaused && resumeCurrentSpeech()) return;
       if (!isSteppingRef.current && !speaker) void exchangeAndSpeak();
     }
   }
@@ -1239,7 +1468,7 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
         </button>
       </header>
 
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", flex: 1, minHeight: 0, position: "relative" }}>
         <div
           ref={containerRef}
           onMouseMove={e => { const r = e.currentTarget.getBoundingClientRect(); setHumanCursor({ x: e.clientX - r.left, y: e.clientY - r.top }); }}
@@ -1263,26 +1492,6 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
             )}
           </div>
 
-          {!started && (
-            <div style={{ position: "absolute", inset: 0, background: "color-mix(in srgb, var(--bg) 85%, transparent)", backdropFilter: "blur(3px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, zIndex: 10 }}>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>AI vs AI · Voice</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 420, textAlign: "center", lineHeight: 1.25 }}>{questionTitle}</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute-2)", textAlign: "center", maxWidth: "38ch", lineHeight: 1.65 }}>
-                Two AIs interview each other. Architecture builds on the whiteboard as they discuss.
-              </div>
-              <div style={{ display: "flex", gap: 18, marginTop: 4 }}>
-                {([["INTERVIEWER", IV], ["CANDIDATE", CX], ["YOU", HU]] as const).map(([l, c]) => (
-                  <div key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: c }}>
-                    <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />{l}
-                  </div>
-                ))}
-              </div>
-              <button type="button" onClick={beginAndPlay} style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 10, padding: "11px 26px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                <Play style={{ width: 16, height: 16 }} />Start Interview
-              </button>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)" }}>Audio starts on click</div>
-            </div>
-          )}
         </div>
 
         {/* Compact transcript */}
@@ -1322,6 +1531,30 @@ export function VoiceAiVsAiSession({ sessionId, questionTitle, initialTranscript
             <div ref={transcriptEndRef} />
           </div>
         </aside>
+
+        {!started && (
+          // Spans the full row (whiteboard + transcript). Centers the question
+          // title across the actual visible canvas the user sees, not the
+          // flex-1 whiteboard column that's offset to the left of the sidebar.
+          <div style={{ position: "absolute", inset: 0, background: "color-mix(in srgb, var(--bg) 85%, transparent)", backdropFilter: "blur(3px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, zIndex: 10 }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute)", textTransform: "uppercase", letterSpacing: "0.12em" }}>AI vs AI · Voice</div>
+            <div style={{ fontSize: 22, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", maxWidth: 520, textAlign: "center", lineHeight: 1.25, padding: "0 32px" }}>{questionTitle}</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--mute-2)", textAlign: "center", maxWidth: "38ch", lineHeight: 1.65 }}>
+              Two AIs interview each other. Architecture builds on the whiteboard as they discuss.
+            </div>
+            <div style={{ display: "flex", gap: 18, marginTop: 4 }}>
+              {([["INTERVIEWER", IV], ["CANDIDATE", CX], ["YOU", HU]] as const).map(([l, c]) => (
+                <div key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: "var(--font-mono)", fontSize: 10, color: c }}>
+                  <div style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />{l}
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={beginAndPlay} style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 10, padding: "11px 26px", borderRadius: 8, background: "var(--accent)", color: "var(--accent-ink)", border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+              <Play style={{ width: 16, height: 16 }} />Start Interview
+            </button>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--mute-2)" }}>Audio starts on click</div>
+          </div>
+        )}
       </div>
 
       {isEnding && (
